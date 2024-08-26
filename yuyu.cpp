@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #pragma region Prelude
 using i8  = int8_t;
@@ -233,6 +234,28 @@ void destroy(Allocator& allocator, Slice<T> s){
 }
 #pragma endregion
 
+struct HeapAllocator : Allocator {
+	void* alloc(isize nbytes, Align align) override {
+		byte* p = new(std::align_val_t(align)) byte[nbytes];
+		if(p != nullptr){
+			mem_zero(p, nbytes);
+		}
+		return (void*)(p);
+	}
+	
+	void free(void const* ptr) override {
+		delete[] (byte const*)(ptr);
+	}
+	
+	void free_all(void) override {
+		return;
+	}
+	
+	i32 capabilities(void) override {
+		using C = Allocator::Capability;
+		return C::Alloc_Any | C::Free_Any | C::Align_Any;
+	}
+};
 
 struct Arena : Allocator {
 	byte* data = nullptr;
@@ -253,7 +276,7 @@ struct Arena : Allocator {
 		return (void*)(aligned_base);
 	}
 
-	void free(void const* ptr) override {
+	void free(void const*) override {
 		return;
 	}
 	
@@ -280,6 +303,7 @@ private:
     T* data = nullptr;
     isize capacity = 0;
     isize length = 0;
+
 public:
     void resize(isize new_cap){
         T* new_data = new T[new_cap];
@@ -311,7 +335,44 @@ public:
 struct Lexer {
 };
 
-int main(void) {
+struct Test {
+	cstring title = "";
+	i32 failed = 0;
+	i32 total = 0;
 
+	void report(){
+		cstring msg = (failed == 0) ? "PASS" : "FAIL";
+		std::printf("[%s] ok in %d/%d\n", msg, total - failed, total);
+	}
+	
+	bool expect(bool pred){
+		if(!pred){
+			std::printf("Failed expect");
+			failed += 1;
+		}
+		total += 1;
+		return pred;
+	}
+	
+	static Test create(cstring title){
+		Test t;
+		t.title = title;
+		return t;
+	}
+	
+	~Test(){
+		report();
+	}
+};
+
+#pragma region Tests
+void test_arena(){
+	auto t = Test::create("Arena Allocator");
+	t.expect(2 + 2 == 4);
+}
+#pragma endregion
+
+int main(void) {
+	test_arena();
     return 0;
 }
