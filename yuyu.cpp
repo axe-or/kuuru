@@ -1,8 +1,9 @@
+// cflags = -O0 -fPIC -pipe -Wall -Wextra
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
 
-#pragma region "Prelude"
+#pragma region Prelude
 using i8  = int8_t;
 using i16 = int16_t;
 using i32 = int32_t;
@@ -22,6 +23,8 @@ using rune = int32_t;
 using uintptr = uintptr_t;
 
 using cstring = char const *;
+
+using ualign = decltype(alignof(int));
 
 static_assert(sizeof(isize) == sizeof(usize), "Mismatched size types");
 
@@ -59,10 +62,9 @@ template<typename T>
 T clamp(T lo, T x, T hi){
     return min(max(lo, x), hi);
 }
-
 #pragma endregion
 
-#pragma region "Debug"
+#pragma region Debug
 #include <iostream> /* DEBUG ONLY. DON'T USE iostream, IT SUCKS. */
 
 void assert(bool cond, cstring msg){
@@ -84,7 +86,7 @@ void print(T x, Args&& ...args){
 }
 #pragma endregion
 
-#pragma region "Memory"
+#pragma region Memory
 void mem_copy(void* dest, void const* src, isize nbytes){
     __builtin_memmove(dest, src, nbytes);
 }
@@ -115,7 +117,7 @@ Integer align_forward(Integer n, usize align){
 }
 #pragma endregion
 
-#pragma region "Containers"
+#pragma region Container
 template<typename T>
 struct Slice {
 private:
@@ -169,6 +171,50 @@ template<typename T>
 void destroy(Slice<T> s){
     delete[] s.raw_data();
 }
+#pragma endregion
+
+// Allocator interface
+struct Allocator {
+	enum Capability : i32 {
+		Alloc_Any = 1 << 0, // Supports arbitrary allocation size
+		Free_Any  = 1 << 1, // Supports individual/out-of-order free
+		Free_All  = 1 << 2, // Supports free all
+		Align_Any = 1 << 3, // Supports arbitrary alignment
+	};
+	
+	virtual void* alloc(isize nbytes, u32 align) = 0;
+	virtual void free(void const* ptr) = 0;
+	virtual void free_all(void) = 0;
+	virtual i32 capabilities(void) = 0;
+};
+
+struct Arena : Allocator {
+	byte* data = nullptr;
+	isize capacity = 0;
+	isize offset = 0;
+
+	void* alloc(isize nbytes, u32 align) override {}
+	
+	void free(void const* ptr) override {
+		return;
+	}
+	
+	void free_all(void) override {
+		offset = 0;
+	}
+	
+	i32 capabilities(void) override {
+		using C = Allocator::Capability;
+		return C::Alloc_Any | C::Free_All | C::Align_Any;
+	}
+	
+	static Arena from_slice(Slice<byte> buf){
+		Arena a;
+		a.data = buf.raw_data();
+		a.capacity = buf.size();
+		return a;
+	}
+};
 
 template<typename T>
 struct DynamicArray {
@@ -203,18 +249,29 @@ public:
         length -= 1;
     }
 };
-#pragma endregion
+
+
+namespace _defer_impl {
+	template<typename F>
+	struct Deferred {
+		F f;
+		Deferred(F&& f) : f(f) {}
+		~Deferred(){ f(); }
+	};
+	
+	#define CONCAT_0(X, Y) X##Y
+	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
+	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
+	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
+		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
+}
 
 struct Lexer {
 };
 
-
 int main(void) {
-    auto values = make_slice<int>(100);
-    for(isize i = 0; i < values.size(); i ++){
-        print(values[i]);
-    }
+    auto arena_mem = make_slice<byte>(8192);
+	auto arena = Arena::from_slice(arena_mem);
 
-    destroy(values);
     return 0;
 }
