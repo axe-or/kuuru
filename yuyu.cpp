@@ -24,8 +24,6 @@ using uintptr = uintptr_t;
 
 using cstring = char const *;
 
-using ualign = decltype(alignof(int));
-
 static_assert(sizeof(isize) == sizeof(usize), "Mismatched size types");
 
 template<typename T>
@@ -62,6 +60,21 @@ template<typename T>
 T clamp(T lo, T x, T hi){
     return min(max(lo, x), hi);
 }
+
+namespace _defer_impl {
+	template<typename F>
+	struct Deferred {
+		F f;
+		Deferred(F&& f) : f(f) {}
+		~Deferred(){ f(); }
+	};
+	
+	#define CONCAT_0(X, Y) X##Y
+	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
+	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
+	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
+		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
+}
 #pragma endregion
 
 #pragma region Debug
@@ -87,6 +100,8 @@ void print(T x, Args&& ...args){
 #pragma endregion
 
 #pragma region Memory
+using Align = decltype(alignof(int));
+
 void mem_copy(void* dest, void const* src, isize nbytes){
     __builtin_memmove(dest, src, nbytes);
 }
@@ -99,12 +114,16 @@ void mem_set(void* dest, byte val, isize nbytes){
     __builtin_memset(dest, val, nbytes);
 }
 
-bool valid_alignment(usize align){
+void mem_zero(void* dest, isize nbytes){
+	mem_set(dest, 0, nbytes);
+}
+
+bool valid_alignment(Align align){
     return (align != 0) && ((align & (align - 1)) == 0);
 }
 
 template<typename Integer>
-Integer align_forward(Integer n, usize align){
+Integer align_forward(Integer n, Align align){
     assert(valid_alignment(align), "Invalid memory alignment");
     Integer aligned = 0;
     Integer mod = n & (Integer(align) - 1);
@@ -114,6 +133,41 @@ Integer align_forward(Integer n, usize align){
     }
 
     return aligned;
+}
+
+// Allocator interface
+struct Allocator {
+	enum Capability : i32 {
+		Alloc_Any = 1 << 0, // Supports arbitrary allocation size
+		Free_Any  = 1 << 1, // Supports individual/out-of-order free
+		Free_All  = 1 << 2, // Supports free all
+		Align_Any = 1 << 3, // Supports arbitrary alignment
+	};
+	
+	virtual void* alloc(isize nbytes, Align align) = 0;
+	virtual void free(void const* ptr) = 0;
+	virtual void free_all(void) = 0;
+	virtual i32 capabilities(void) = 0;
+};
+
+template<typename T>
+T* make(Allocator& allocator){
+	T* ptr = allocator.alloc(sizeof(T), alignof(T));
+	if(ptr != nullptr){
+		mem_zero(ptr, sizeof(T));
+	}
+	return ptr;
+}
+
+template<typename T>
+void destroy(T* ptr, Allocator& allocator){
+	if(ptr == nullptr){ return; }
+	ptr->~T();
+	allocator.free(ptr);
+}
+
+void free_all(Allocator& a){
+	a.free_all();
 }
 #pragma endregion
 
@@ -162,39 +216,43 @@ public:
 };
 
 template<typename T>
-static Slice<T> make_slice(isize n){
-    T* ptr = new T[n];
-    return Slice<T>::from(ptr, n);
+static Slice<T> make_slice(Allocator& allocator, isize n){
+	T* elems = allocator.alloc(n * sizeof(T), alignof(T));
+	if(elems != nullptr){
+		mem_zero(elems, n * sizeof(T));
+	}
+	return Slice<T>::from(elems, n);
 }
 
 template<typename T>
-void destroy(Slice<T> s){
-    delete[] s.raw_data();
+void destroy(Allocator& allocator, Slice<T> s){
+	for(isize i = 0; i < s.size(); i += 1){
+		s[i].~T();
+	}
+	allocator.free(s.raw_data());
 }
 #pragma endregion
 
-// Allocator interface
-struct Allocator {
-	enum Capability : i32 {
-		Alloc_Any = 1 << 0, // Supports arbitrary allocation size
-		Free_Any  = 1 << 1, // Supports individual/out-of-order free
-		Free_All  = 1 << 2, // Supports free all
-		Align_Any = 1 << 3, // Supports arbitrary alignment
-	};
-	
-	virtual void* alloc(isize nbytes, u32 align) = 0;
-	virtual void free(void const* ptr) = 0;
-	virtual void free_all(void) = 0;
-	virtual i32 capabilities(void) = 0;
-};
 
 struct Arena : Allocator {
 	byte* data = nullptr;
-	isize capacity = 0;
-	isize offset = 0;
-
-	void* alloc(isize nbytes, u32 align) override {}
+	uintptr capacity = 0;
+	uintptr offset = 0;
 	
+	void* alloc(isize nbytes, Align align) override {
+		auto size = uintptr(nbytes);
+		auto base = uintptr(data) + offset;
+		auto limit = uintptr(data) + capacity;
+		auto aligned_base = align_forward(base, align);
+				
+		if((aligned_base + size) >= limit){
+			return nullptr; /* Out of memory */
+		}
+		
+		offset = aligned_base - base + size;
+		return (void*)(aligned_base);
+	}
+
 	void free(void const* ptr) override {
 		return;
 	}
@@ -250,28 +308,10 @@ public:
     }
 };
 
-
-namespace _defer_impl {
-	template<typename F>
-	struct Deferred {
-		F f;
-		Deferred(F&& f) : f(f) {}
-		~Deferred(){ f(); }
-	};
-	
-	#define CONCAT_0(X, Y) X##Y
-	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
-	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
-	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
-		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
-}
-
 struct Lexer {
 };
 
 int main(void) {
-    auto arena_mem = make_slice<byte>(8192);
-	auto arena = Arena::from_slice(arena_mem);
 
     return 0;
 }
