@@ -123,11 +123,10 @@ bool valid_alignment(Align align){
     return (align != 0) && ((align & (align - 1)) == 0);
 }
 
-template<typename Integer>
-Integer align_forward(Integer n, Align align){
+uintptr align_forward(uintptr n, Align align){
     assert(valid_alignment(align), "Invalid memory alignment");
-    Integer aligned = 0;
-    Integer mod = n & (Integer(align) - 1);
+    uintptr aligned = 0;
+    uintptr mod = n & (uintptr(align) - 1);
 
     if(mod != 0){
         aligned = n + (align - mod);
@@ -153,7 +152,7 @@ struct Allocator {
 
 template<typename T>
 T* make(Allocator& allocator){
-	T* ptr = allocator.alloc(sizeof(T), alignof(T));
+	T* ptr = (T*)(allocator.alloc(sizeof(T), alignof(T)));
 	if(ptr != nullptr){
 		mem_zero(ptr, sizeof(T));
 	}
@@ -218,7 +217,7 @@ public:
 
 template<typename T>
 static Slice<T> make_slice(Allocator& allocator, isize n){
-	T* elems = allocator.alloc(n * sizeof(T), alignof(T));
+	T* elems = (T*)(allocator.alloc(n * sizeof(T), alignof(T)));
 	if(elems != nullptr){
 		mem_zero(elems, n * sizeof(T));
 	}
@@ -255,6 +254,10 @@ struct HeapAllocator : Allocator {
 		using C = Allocator::Capability;
 		return C::Alloc_Any | C::Free_Any | C::Align_Any;
 	}
+	
+	static HeapAllocator get(){
+		return HeapAllocator{};
+	}
 };
 
 struct Arena : Allocator {
@@ -266,13 +269,15 @@ struct Arena : Allocator {
 		auto size = uintptr(nbytes);
 		auto base = uintptr(data) + offset;
 		auto limit = uintptr(data) + capacity;
+		
 		auto aligned_base = align_forward(base, align);
-				
+		auto padding = aligned_base - base;
+		
 		if((aligned_base + size) >= limit){
 			return nullptr; /* Out of memory */
 		}
-		
-		offset = aligned_base - base + size;
+		print("Padding:", padding, "Size:", size, "Remaning:", limit - base);
+		offset += padding + size;
 		return (void*)(aligned_base);
 	}
 
@@ -289,7 +294,7 @@ struct Arena : Allocator {
 		return C::Alloc_Any | C::Free_All | C::Align_Any;
 	}
 	
-	static Arena from_slice(Slice<byte> buf){
+	static Arena from(Slice<byte> buf){
 		Arena a;
 		a.data = buf.raw_data();
 		a.capacity = buf.size();
@@ -332,8 +337,6 @@ public:
     }
 };
 
-struct Lexer {
-};
 
 struct Test {
 	cstring title = "";
@@ -347,7 +350,7 @@ struct Test {
 	
 	bool expect(bool pred){
 		if(!pred){
-			std::printf("Failed expect");
+			std::printf("Failed expect\n");
 			failed += 1;
 		}
 		total += 1;
@@ -368,7 +371,13 @@ struct Test {
 #pragma region Tests
 void test_arena(){
 	auto t = Test::create("Arena Allocator");
-	t.expect(2 + 2 == 4);
+	auto heap_alloc = HeapAllocator::get();
+	auto buf = make_slice<byte>(heap_alloc, 128);
+	auto arena = Arena::from(buf);
+	
+	print(arena.offset);
+	i32* n = make<i32>(arena);
+	print(arena.offset);
 }
 #pragma endregion
 
