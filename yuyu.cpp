@@ -76,6 +76,15 @@ namespace _defer_impl {
 	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
 		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
 }
+
+#define prohibit_copy(T) \
+	T(T const&) = delete; \
+	void operator=(T const&) = delete;
+
+#define prohibit_move(T) \
+	T(T &&) = delete; \
+	void operator=(T &&) = delete;
+
 #pragma endregion
 
 #pragma region Debug
@@ -216,7 +225,7 @@ public:
 };
 
 template<typename T> [[nodiscard]]
-static Slice<T> make_slice(Allocator& allocator, isize n){
+static Slice<T> make_slice(isize n, Allocator& allocator){
 	T* elems = (T*)(allocator.alloc(n * sizeof(T), alignof(T)));
 	if(elems != nullptr){
 		mem_zero(elems, n * sizeof(T));
@@ -225,7 +234,7 @@ static Slice<T> make_slice(Allocator& allocator, isize n){
 }
 
 template<typename T>
-void destroy(Allocator& allocator, Slice<T> s){
+void destroy(Slice<T> s, Allocator& allocator){
 	for(isize i = 0; i < s.size(); i += 1){
 		s[i].~T();
 	}
@@ -240,6 +249,8 @@ struct Arena : Allocator {
 	uintptr offset = 0;
 
 	void* alloc(isize nbytes, Align align) override {
+		if(nbytes == 0){ return nullptr; }
+		
 		auto size = uintptr(nbytes);
 		auto base = uintptr(data) + offset;
 		auto limit = uintptr(data) + capacity;
@@ -278,6 +289,7 @@ struct Arena : Allocator {
 
 struct HeapAllocator : Allocator {
 	void* alloc(isize nbytes, Align align) override {
+		if(nbytes == 0){ return nullptr; }
 		byte* p = new(std::align_val_t(align)) byte[nbytes];
 		if(p != nullptr){
 			mem_zero(p, nbytes);
@@ -286,6 +298,7 @@ struct HeapAllocator : Allocator {
 	}
 
 	void free(void const* ptr) override {
+		if(ptr == nullptr) { return; }
 		delete[] (byte const*)(ptr);
 	}
 
@@ -318,7 +331,7 @@ public:
         mem_copy(new_data, data, nbytes);
         delete [] data;
 
-        length = min(new_cap, length);
+		length = min(new_cap, length);
         capacity = new_cap;
         data = new_data;
     }
@@ -372,7 +385,8 @@ struct Test {
 void test_arena(){
 	auto t = Test::create("Arena Allocator");
 	auto heap_alloc = HeapAllocator::get();
-	auto buf = make_slice<byte>(heap_alloc, 128);
+	auto buf = make_slice<byte>(128, heap_alloc);
+	defer(destroy(buf, heap_alloc));
 	auto arena = Arena::from(buf);
 	{
 		auto old_offset = arena.offset;
@@ -395,12 +409,12 @@ void test_arena(){
 		t.expect(old_offset + 4 + 8 == arena.offset);
 	}
 	{
-		auto p = make_slice<byte>(arena, 128);
+		auto p = make_slice<byte>(128, arena);
 		t.expect(p.empty());
 	}
 	free_all(arena);
 	{
-		auto p = make_slice<byte>(arena, 128);
+		auto p = make_slice<byte>(128, arena);
 		t.expect(!p.empty());
 		p[127] = '1';
 	}
@@ -413,5 +427,11 @@ void test_arena(){
 
 int main(void) {
 	test_arena();
+	auto allocator = HeapAllocator::get();
+	auto numbers = make_slice<i32>(100, allocator);
+	for(int i = 0; i < numbers.size(); i ++){
+		print(numbers[i]);
+	}
+	destroy(numbers, allocator);
     return 0;
 }
