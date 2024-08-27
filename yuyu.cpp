@@ -233,33 +233,7 @@ void destroy(Allocator& allocator, Slice<T> s){
 }
 #pragma endregion
 
-struct HeapAllocator : Allocator {
-	void* alloc(isize nbytes, Align align) override {
-		byte* p = new(std::align_val_t(align)) byte[nbytes];
-		if(p != nullptr){
-			mem_zero(p, nbytes);
-		}
-		return (void*)(p);
-	}
-
-	void free(void const* ptr) override {
-		delete[] (byte const*)(ptr);
-	}
-
-	void free_all(void) override {
-		return;
-	}
-
-	i32 capabilities(void) override {
-		using C = Allocator::Capability;
-		return C::Alloc_Any | C::Free_Any | C::Align_Any;
-	}
-
-	static HeapAllocator get(){
-		return HeapAllocator{};
-	}
-};
-
+#pragma region Allocators
 struct Arena : Allocator {
 	byte* data = nullptr;
 	uintptr capacity = 0;
@@ -298,6 +272,34 @@ struct Arena : Allocator {
 		a.data = buf.raw_data();
 		a.capacity = buf.size();
 		return a;
+	}
+};
+#pragma endregion
+
+struct HeapAllocator : Allocator {
+	void* alloc(isize nbytes, Align align) override {
+		byte* p = new(std::align_val_t(align)) byte[nbytes];
+		if(p != nullptr){
+			mem_zero(p, nbytes);
+		}
+		return (void*)(p);
+	}
+
+	void free(void const* ptr) override {
+		delete[] (byte const*)(ptr);
+	}
+
+	void free_all(void) override {
+		return;
+	}
+
+	i32 capabilities(void) override {
+		using C = Allocator::Capability;
+		return C::Alloc_Any | C::Free_Any | C::Align_Any;
+	}
+
+	static HeapAllocator get(){
+		return HeapAllocator{};
 	}
 };
 
