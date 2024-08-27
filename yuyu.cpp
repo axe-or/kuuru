@@ -322,14 +322,16 @@ private:
     T* data = nullptr;
     isize capacity = 0;
     isize length = 0;
+	Allocator* allocator = nullptr;
 
 public:
     void resize(isize new_cap){
-        T* new_data = new T[new_cap];
+        T* new_data = allocator->alloc(sizeof(T) * n, alignof(T));
+		assert(new_data != nullptr, "Failed allocation");
         isize nbytes = sizeof(T) * new_cap;
 
         mem_copy(new_data, data, nbytes);
-        delete [] data;
+        allocator->free(data);
 
 		length = min(new_cap, length);
         capacity = new_cap;
@@ -349,6 +351,23 @@ public:
         if(length == 0){ return; }
         length -= 1;
     }
+
+    T& operator[](isize idx){
+        assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
+        return data[idx];
+    }
+
+    T const& operator[](isize idx) const {
+        assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
+        return data[idx];
+    }
+	
+	Slice<T> extract(){
+		resize(length);
+		auto s = Slice<T>::from(data, length);
+		data = nullptr;
+		length = 0;
+	}
 };
 
 #pragma region Tests
