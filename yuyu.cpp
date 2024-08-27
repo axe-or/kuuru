@@ -69,7 +69,7 @@ namespace _defer_impl {
 		Deferred(F&& f) : f(f) {}
 		~Deferred(){ f(); }
 	};
-	
+
 	#define CONCAT_0(X, Y) X##Y
 	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
 	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
@@ -125,8 +125,8 @@ bool valid_alignment(Align align){
 
 uintptr align_forward(uintptr n, Align align){
     assert(valid_alignment(align), "Invalid memory alignment");
-    uintptr aligned = 0;
     uintptr mod = n & (uintptr(align) - 1);
+	uintptr aligned = n;
 
     if(mod != 0){
         aligned = n + (align - mod);
@@ -143,14 +143,14 @@ struct Allocator {
 		Free_All  = 1 << 2, // Supports free all
 		Align_Any = 1 << 3, // Supports arbitrary alignment
 	};
-	
+
 	virtual void* alloc(isize nbytes, Align align) = 0;
 	virtual void free(void const* ptr) = 0;
 	virtual void free_all(void) = 0;
 	virtual i32 capabilities(void) = 0;
 };
 
-template<typename T>
+template<typename T> [[nodiscard]]
 T* make(Allocator& allocator){
 	T* ptr = (T*)(allocator.alloc(sizeof(T), alignof(T)));
 	if(ptr != nullptr){
@@ -215,7 +215,7 @@ public:
     }
 };
 
-template<typename T>
+template<typename T> [[nodiscard]]
 static Slice<T> make_slice(Allocator& allocator, isize n){
 	T* elems = (T*)(allocator.alloc(n * sizeof(T), alignof(T)));
 	if(elems != nullptr){
@@ -241,20 +241,20 @@ struct HeapAllocator : Allocator {
 		}
 		return (void*)(p);
 	}
-	
+
 	void free(void const* ptr) override {
 		delete[] (byte const*)(ptr);
 	}
-	
+
 	void free_all(void) override {
 		return;
 	}
-	
+
 	i32 capabilities(void) override {
 		using C = Allocator::Capability;
 		return C::Alloc_Any | C::Free_Any | C::Align_Any;
 	}
-	
+
 	static HeapAllocator get(){
 		return HeapAllocator{};
 	}
@@ -264,19 +264,18 @@ struct Arena : Allocator {
 	byte* data = nullptr;
 	uintptr capacity = 0;
 	uintptr offset = 0;
-	
+
 	void* alloc(isize nbytes, Align align) override {
 		auto size = uintptr(nbytes);
 		auto base = uintptr(data) + offset;
 		auto limit = uintptr(data) + capacity;
-		
+
 		auto aligned_base = align_forward(base, align);
 		auto padding = aligned_base - base;
-		
-		if((aligned_base + size) >= limit){
+
+		if((aligned_base + size) > limit){
 			return nullptr; /* Out of memory */
 		}
-		print("Padding:", padding, "Size:", size, "Remaning:", limit - base);
 		offset += padding + size;
 		return (void*)(aligned_base);
 	}
@@ -284,16 +283,16 @@ struct Arena : Allocator {
 	void free(void const*) override {
 		return;
 	}
-	
+
 	void free_all(void) override {
 		offset = 0;
 	}
-	
+
 	i32 capabilities(void) override {
 		using C = Allocator::Capability;
 		return C::Alloc_Any | C::Free_All | C::Align_Any;
 	}
-	
+
 	static Arena from(Slice<byte> buf){
 		Arena a;
 		a.data = buf.raw_data();
@@ -337,7 +336,7 @@ public:
     }
 };
 
-
+#pragma region Tests
 struct Test {
 	cstring title = "";
 	i32 failed = 0;
@@ -345,9 +344,9 @@ struct Test {
 
 	void report(){
 		cstring msg = (failed == 0) ? "PASS" : "FAIL";
-		std::printf("[%s] ok in %d/%d\n", msg, total - failed, total);
+		std::printf("[%s] %s ok in %d/%d\n", title, msg, total - failed, total);
 	}
-	
+
 	bool expect(bool pred){
 		if(!pred){
 			std::printf("Failed expect\n");
@@ -356,28 +355,57 @@ struct Test {
 		total += 1;
 		return pred;
 	}
-	
+
 	static Test create(cstring title){
 		Test t;
 		t.title = title;
 		return t;
 	}
-	
+
 	~Test(){
 		report();
 	}
 };
 
-#pragma region Tests
 void test_arena(){
 	auto t = Test::create("Arena Allocator");
 	auto heap_alloc = HeapAllocator::get();
 	auto buf = make_slice<byte>(heap_alloc, 128);
 	auto arena = Arena::from(buf);
-	
-	print(arena.offset);
-	i32* n = make<i32>(arena);
-	print(arena.offset);
+	{
+		auto old_offset = arena.offset;
+		(void) make<i32>(arena);
+		t.expect(old_offset + 4 == arena.offset);		
+	}
+	{
+		auto old_offset = arena.offset;
+		(void) make<i8>(arena);
+		t.expect(old_offset + 1 == arena.offset);
+	}
+	{
+		auto old_offset = arena.offset;
+		(void) make<i32>(arena);
+		t.expect(old_offset + 3 + 4 == arena.offset);
+	}
+	{
+		auto old_offset = arena.offset;
+		(void) make<i64>(arena);
+		t.expect(old_offset + 4 + 8 == arena.offset);
+	}
+	{
+		auto p = make_slice<byte>(arena, 128);
+		t.expect(p.empty());
+	}
+	free_all(arena);
+	{
+		auto p = make_slice<byte>(arena, 128);
+		t.expect(!p.empty());
+		p[127] = '1';
+	}
+	{
+		auto p = make<i8>(arena);
+		t.expect(p == nullptr);
+	}
 }
 #pragma endregion
 
