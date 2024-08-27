@@ -243,6 +243,35 @@ void destroy(Slice<T> s, Allocator& allocator){
 #pragma endregion
 
 #pragma region Allocators
+struct HeapAllocator : Allocator {
+	void* alloc(isize nbytes, Align align) override {
+		if(nbytes == 0){ return nullptr; }
+		byte* p = new(std::align_val_t(align)) byte[nbytes];
+		if(p != nullptr){
+			mem_zero(p, nbytes);
+		}
+		return (void*)(p);
+	}
+
+	void free(void const* ptr) override {
+		if(ptr == nullptr) { return; }
+		delete[] (byte const*)(ptr);
+	}
+
+	void free_all(void) override {
+		return;
+	}
+
+	i32 capabilities(void) override {
+		using C = Allocator::Capability;
+		return C::Alloc_Any | C::Free_Any | C::Align_Any;
+	}
+
+	static HeapAllocator get(){
+		return HeapAllocator{};
+	}
+};
+
 struct Arena : Allocator {
 	byte* data = nullptr;
 	uintptr capacity = 0;
@@ -250,7 +279,7 @@ struct Arena : Allocator {
 
 	void* alloc(isize nbytes, Align align) override {
 		if(nbytes == 0){ return nullptr; }
-		
+
 		auto size = uintptr(nbytes);
 		auto base = uintptr(data) + offset;
 		auto limit = uintptr(data) + capacity;
@@ -286,35 +315,6 @@ struct Arena : Allocator {
 	}
 };
 #pragma endregion
-
-struct HeapAllocator : Allocator {
-	void* alloc(isize nbytes, Align align) override {
-		if(nbytes == 0){ return nullptr; }
-		byte* p = new(std::align_val_t(align)) byte[nbytes];
-		if(p != nullptr){
-			mem_zero(p, nbytes);
-		}
-		return (void*)(p);
-	}
-
-	void free(void const* ptr) override {
-		if(ptr == nullptr) { return; }
-		delete[] (byte const*)(ptr);
-	}
-
-	void free_all(void) override {
-		return;
-	}
-
-	i32 capabilities(void) override {
-		using C = Allocator::Capability;
-		return C::Alloc_Any | C::Free_Any | C::Align_Any;
-	}
-
-	static HeapAllocator get(){
-		return HeapAllocator{};
-	}
-};
 
 template<typename T>
 struct DynamicArray {
@@ -391,7 +391,7 @@ void test_arena(){
 	{
 		auto old_offset = arena.offset;
 		(void) make<i32>(arena);
-		t.expect(old_offset + 4 == arena.offset);		
+		t.expect(old_offset + 4 == arena.offset);
 	}
 	{
 		auto old_offset = arena.offset;
