@@ -160,8 +160,8 @@ struct Allocator {
 };
 
 template<typename T> [[nodiscard]]
-T* make(Allocator& allocator){
-	T* ptr = (T*)(allocator.alloc(sizeof(T), alignof(T)));
+T* make(Allocator* allocator){
+	T* ptr = (T*)(allocator->alloc(sizeof(T), alignof(T)));
 	if(ptr != nullptr){
 		mem_zero(ptr, sizeof(T));
 	}
@@ -169,15 +169,16 @@ T* make(Allocator& allocator){
 }
 
 template<typename T>
-void destroy(T* ptr, Allocator& allocator){
+void destroy(T* ptr, Allocator* allocator){
 	if(ptr == nullptr){ return; }
 	ptr->~T();
-	allocator.free(ptr);
+	allocator->free(ptr);
 }
 
-void free_all(Allocator& a){
-	a.free_all();
+void free_all(Allocator* a){
+	a->free_all();
 }
+
 #pragma endregion
 
 #pragma region Container
@@ -225,8 +226,8 @@ public:
 };
 
 template<typename T> [[nodiscard]]
-static Slice<T> make_slice(isize n, Allocator& allocator){
-	T* elems = (T*)(allocator.alloc(n * sizeof(T), alignof(T)));
+static Slice<T> make_slice(isize n, Allocator* allocator){
+	T* elems = (T*)(allocator->alloc(n * sizeof(T), alignof(T)));
 	if(elems != nullptr){
 		mem_zero(elems, n * sizeof(T));
 	}
@@ -234,11 +235,11 @@ static Slice<T> make_slice(isize n, Allocator& allocator){
 }
 
 template<typename T>
-void destroy(Slice<T> s, Allocator& allocator){
+void destroy(Slice<T> s, Allocator* allocator){
 	for(isize i = 0; i < s.size(); i += 1){
 		s[i].~T();
 	}
-	allocator.free(s.raw_data());
+	allocator->free(s.raw_data());
 }
 #pragma endregion
 
@@ -267,8 +268,9 @@ struct HeapAllocator : Allocator {
 		return C::Alloc_Any | C::Free_Any | C::Align_Any;
 	}
 
-	static HeapAllocator get(){
-		return HeapAllocator{};
+	static Allocator* get(){
+		static HeapAllocator handle{};
+		return &handle;
 	}
 };
 
@@ -326,11 +328,17 @@ private:
 
 public:
     void resize(isize new_cap){
-        T* new_data = allocator->alloc(sizeof(T) * n, alignof(T));
+        T* new_data = allocator->alloc(sizeof(T) * new_cap, alignof(T));
 		assert(new_data != nullptr, "Failed allocation");
         isize nbytes = sizeof(T) * new_cap;
 
-        mem_copy(new_data, data, nbytes);
+		if(data != nullptr){
+			mem_copy(new_data, data, nbytes);
+		}
+		
+		if(new_cap > length){
+			mem_zero(&new_data[length], (new_cap - length) * sizeof(T));
+		}
         allocator->free(data);
 
 		length = min(new_cap, length);
@@ -361,12 +369,18 @@ public:
         assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
         return data[idx];
     }
-	
+
 	Slice<T> extract(){
 		resize(length);
 		auto s = Slice<T>::from(data, length);
 		data = nullptr;
 		length = 0;
+	}
+	
+	static DynamicArray create(Allocator* allocator){
+		DynamicArray arr;
+		arr.allocator = allocator;
+		return arr;
 	}
 };
 
@@ -407,50 +421,50 @@ void test_arena(){
 	auto buf = make_slice<byte>(128, heap_alloc);
 	defer(destroy(buf, heap_alloc));
 	auto arena = Arena::from(buf);
+	Allocator* allocator = &arena;
 	{
 		auto old_offset = arena.offset;
-		(void) make<i32>(arena);
+		(void) make<i32>(allocator);
 		t.expect(old_offset + 4 == arena.offset);
 	}
 	{
 		auto old_offset = arena.offset;
-		(void) make<i8>(arena);
+		(void) make<i8>(allocator);
 		t.expect(old_offset + 1 == arena.offset);
 	}
 	{
 		auto old_offset = arena.offset;
-		(void) make<i32>(arena);
+		(void) make<i32>(allocator);
 		t.expect(old_offset + 3 + 4 == arena.offset);
 	}
 	{
 		auto old_offset = arena.offset;
-		(void) make<i64>(arena);
+		(void) make<i64>(allocator);
 		t.expect(old_offset + 4 + 8 == arena.offset);
 	}
 	{
-		auto p = make_slice<byte>(128, arena);
+		auto p = make_slice<byte>(128, allocator);
 		t.expect(p.empty());
 	}
-	free_all(arena);
+	free_all(allocator);
 	{
-		auto p = make_slice<byte>(128, arena);
+		auto p = make_slice<byte>(128, allocator);
 		t.expect(!p.empty());
 		p[127] = '1';
 	}
 	{
-		auto p = make<i8>(arena);
+		auto p = make<i8>(allocator);
 		t.expect(p == nullptr);
 	}
 }
 #pragma endregion
 
+
 int main(void) {
 	test_arena();
-	auto allocator = HeapAllocator::get();
-	auto numbers = make_slice<i32>(100, allocator);
-	for(int i = 0; i < numbers.size(); i ++){
-		print(numbers[i]);
-	}
-	destroy(numbers, allocator);
+	auto heap_alloc = HeapAllocator::get();
+	
+	auto arr = DynamicArray<i32>::create(heap_alloc);
+	
     return 0;
 }
