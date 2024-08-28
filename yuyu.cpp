@@ -216,7 +216,6 @@ void destroy(T* ptr, Allocator allocator){
 void free_all(Allocator a){
 	a.free_all();
 }
-
 #pragma endregion
 
 #pragma region Container
@@ -396,13 +395,11 @@ struct Arena {
 
 template<typename T>
 struct DynamicArray {
-private:
     T* data = nullptr;
     isize capacity = 0;
     isize length = 0;
 	Allocator allocator = {0};
 
-public:
     void resize(isize new_cap){
         T* new_data = allocator.alloc(sizeof(T) * new_cap, alignof(T));
 		assert(new_data != nullptr, "Failed allocation");
@@ -445,6 +442,13 @@ public:
         assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
         return data[idx];
     }
+	
+	isize size() const {
+		return length;
+	}
+	
+isize cap() const }
+
 
 	Slice<T> extract(){
 		resize(length);
@@ -539,9 +543,22 @@ void test_dynamic_array(){
 	auto t = Test::create("Dynamic Array");
 	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
 	
+	constexpr auto print_arr = [](DynamicArray<i32> a){
+		print("cap:", a.cap(), "len:", a.len());
+		for(isize i = 0; i < a.size(); i += 1){
+			std::cout << a[i] << ' ';
+		}
+		print("");
+	};
+	
+	arr.append(6);
+	arr.append(9);
+	print_arr(arr);
+	
 }
 
 int main(void) {
 	test_arena();
+	test_dynamic_array();
     return 0;
 }
