@@ -146,22 +146,60 @@ uintptr align_forward(uintptr n, Align align){
 
 // Allocator interface
 struct Allocator {
-	enum Capability : i32 {
+	enum class Operation : i32 {
+		Query = 0,
+		Alloc,
+		Free,
+		Free_All,
+	};
+
+	using Func = void* (*)(
+		Operation op,
+		void* impl,
+		isize size,
+		Align align,
+		void const* ptr,
+		i32* query_res);
+
+	enum class Capability : i32 {
 		Alloc_Any = 1 << 0, // Supports arbitrary allocation size
 		Free_Any  = 1 << 1, // Supports individual/out-of-order free
 		Free_All  = 1 << 2, // Supports free all
 		Align_Any = 1 << 3, // Supports arbitrary alignment
 	};
-
-	virtual void* alloc(isize nbytes, Align align) = 0;
-	virtual void free(void const* ptr) = 0;
-	virtual void free_all(void) = 0;
-	virtual i32 capabilities(void) = 0;
+	
+	Allocator::Func fn_ = nullptr;
+	void* impl_ = nullptr;
+	
+	void* alloc(isize nbytes, Align align){
+		return fn_(Operation::Alloc, impl_, nbytes, align, nullptr, nullptr);
+	}
+	
+	void free(void const* ptr){
+		fn_(Operation::Free, impl_, 0, 0, ptr, nullptr);
+	}
+	
+	void free_all(void){
+		fn_(Operation::Free_All, impl_, 0, 0, nullptr, nullptr);
+	}
+	
+	i32 capabilities(void){
+		i32 cap = 0;
+		fn_(Operation::Query, impl_, 0, 0, nullptr, &cap);
+		return cap;
+	}
+	
+	static Allocator from(void* impl, Allocator::Func fn){
+		Allocator a;
+		a.fn_ = fn;
+		a.impl_ = impl;
+		return a;
+	}
 };
 
 template<typename T> [[nodiscard]]
-T* make(Allocator* allocator){
-	T* ptr = (T*)(allocator->alloc(sizeof(T), alignof(T)));
+T* make(Allocator allocator){
+	T* ptr = (T*)(allocator.alloc(sizeof(T), alignof(T)));
 	if(ptr != nullptr){
 		mem_zero(ptr, sizeof(T));
 	}
@@ -169,14 +207,14 @@ T* make(Allocator* allocator){
 }
 
 template<typename T>
-void destroy(T* ptr, Allocator* allocator){
+void destroy(T* ptr, Allocator allocator){
 	if(ptr == nullptr){ return; }
 	ptr->~T();
-	allocator->free(ptr);
+	allocator.free(ptr);
 }
 
-void free_all(Allocator* a){
-	a->free_all();
+void free_all(Allocator a){
+	a.free_all();
 }
 
 #pragma endregion
@@ -226,8 +264,8 @@ public:
 };
 
 template<typename T> [[nodiscard]]
-static Slice<T> make_slice(isize n, Allocator* allocator){
-	T* elems = (T*)(allocator->alloc(n * sizeof(T), alignof(T)));
+static Slice<T> make_slice(isize n, Allocator allocator){
+	T* elems = (T*)(allocator.alloc(n * sizeof(T), alignof(T)));
 	if(elems != nullptr){
 		mem_zero(elems, n * sizeof(T));
 	}
@@ -235,17 +273,17 @@ static Slice<T> make_slice(isize n, Allocator* allocator){
 }
 
 template<typename T>
-void destroy(Slice<T> s, Allocator* allocator){
+void destroy(Slice<T> s, Allocator allocator){
 	for(isize i = 0; i < s.size(); i += 1){
 		s[i].~T();
 	}
-	allocator->free(s.raw_data());
+	allocator.free(s.raw_data());
 }
 #pragma endregion
 
 #pragma region Allocators
-struct HeapAllocator : Allocator {
-	void* alloc(isize nbytes, Align align) override {
+struct HeapAllocator {
+	static void* alloc(isize nbytes, Align align) {
 		if(nbytes == 0){ return nullptr; }
 		byte* p = new(std::align_val_t(align)) byte[nbytes];
 		if(p != nullptr){
@@ -254,32 +292,48 @@ struct HeapAllocator : Allocator {
 		return (void*)(p);
 	}
 
-	void free(void const* ptr) override {
+	static void free(void const* ptr) {
 		if(ptr == nullptr) { return; }
 		delete[] (byte const*)(ptr);
 	}
 
-	void free_all(void) override {
-		return;
-	}
+	static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
+		using O = Allocator::Operation;
 
-	i32 capabilities(void) override {
-		using C = Allocator::Capability;
-		return C::Alloc_Any | C::Free_Any | C::Align_Any;
-	}
+		(void)impl;
 
-	static Allocator* get(){
-		static HeapAllocator handle{};
-		return &handle;
+		switch(op){
+			case O::Alloc:
+				return HeapAllocator::alloc(size, align);
+			break;
+
+			case O::Free:
+				HeapAllocator::free(ptr);
+			break;
+	
+			case O::Free_All: break;
+
+			case O::Query:
+				using C = Allocator::Capability;
+				*query_res = i32(C::Alloc_Any) | i32(C::Free_Any) | i32(C::Align_Any);
+			break;
+		}
+		
+		return nullptr;
+
+	}
+	
+	static Allocator get(){
+        return Allocator::from(nullptr, _allocator_func);
 	}
 };
 
-struct Arena : Allocator {
+struct Arena {
 	byte* data = nullptr;
 	uintptr capacity = 0;
 	uintptr offset = 0;
 
-	void* alloc(isize nbytes, Align align) override {
+	void* alloc(isize nbytes, Align align) {
 		if(nbytes == 0){ return nullptr; }
 
 		auto size = uintptr(nbytes);
@@ -296,17 +350,8 @@ struct Arena : Allocator {
 		return (void*)(aligned_base);
 	}
 
-	void free(void const*) override {
-		return;
-	}
-
-	void free_all(void) override {
+	void free_all(void) {
 		offset = 0;
-	}
-
-	i32 capabilities(void) override {
-		using C = Allocator::Capability;
-		return C::Alloc_Any | C::Free_All | C::Align_Any;
 	}
 
 	static Arena from(Slice<byte> buf){
@@ -315,7 +360,38 @@ struct Arena : Allocator {
 		a.capacity = buf.size();
 		return a;
 	}
+	
+	static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
+		using O = Allocator::Operation;
+		
+		auto self = (Arena*)(impl);
+        (void)ptr;
+		
+		switch(op){
+			case O::Alloc:
+				return self->alloc(size, align);
+			break;
+			
+			case O::Free: break;
+			
+			case O::Free_All:
+				self->free_all();
+			break;
+			
+			case O::Query:
+				using C = Allocator::Capability;
+				*query_res = i32(C::Alloc_Any) | i32(C::Free_All) | i32(C::Align_Any);
+			break;
+		}
+		
+		return nullptr;
+	}
+	
+	Allocator allocator(){
+		return Allocator::from((void*)(this), _allocator_func);
+	}
 };
+
 #pragma endregion
 
 template<typename T>
@@ -324,11 +400,11 @@ private:
     T* data = nullptr;
     isize capacity = 0;
     isize length = 0;
-	Allocator* allocator = nullptr;
+	Allocator allocator = {0};
 
 public:
     void resize(isize new_cap){
-        T* new_data = allocator->alloc(sizeof(T) * new_cap, alignof(T));
+        T* new_data = allocator.alloc(sizeof(T) * new_cap, alignof(T));
 		assert(new_data != nullptr, "Failed allocation");
         isize nbytes = sizeof(T) * new_cap;
 
@@ -339,7 +415,7 @@ public:
 		if(new_cap > length){
 			mem_zero(&new_data[length], (new_cap - length) * sizeof(T));
 		}
-        allocator->free(data);
+        allocator.free(data);
 
 		length = min(new_cap, length);
         capacity = new_cap;
@@ -377,7 +453,7 @@ public:
 		length = 0;
 	}
 	
-	static DynamicArray create(Allocator* allocator){
+	static DynamicArray create(Allocator allocator){
 		DynamicArray arr;
 		arr.allocator = allocator;
 		return arr;
@@ -421,7 +497,7 @@ void test_arena(){
 	auto buf = make_slice<byte>(128, heap_alloc);
 	defer(destroy(buf, heap_alloc));
 	auto arena = Arena::from(buf);
-	Allocator* allocator = &arena;
+    auto allocator = arena.allocator();
 	{
 		auto old_offset = arena.offset;
 		(void) make<i32>(allocator);
@@ -459,12 +535,13 @@ void test_arena(){
 }
 #pragma endregion
 
+void test_dynamic_array(){
+	auto t = Test::create("Dynamic Array");
+	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
+	
+}
 
 int main(void) {
 	test_arena();
-	auto heap_alloc = HeapAllocator::get();
-	
-	auto arr = DynamicArray<i32>::create(heap_alloc);
-	
     return 0;
 }
