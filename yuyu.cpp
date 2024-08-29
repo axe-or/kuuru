@@ -401,7 +401,7 @@ struct DynamicArray {
 	Allocator allocator = {0};
 
     void resize(isize new_cap){
-        T* new_data = allocator.alloc(sizeof(T) * new_cap, alignof(T));
+        T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
 		assert(new_data != nullptr, "Failed allocation");
         isize nbytes = sizeof(T) * new_cap;
 
@@ -431,7 +431,36 @@ struct DynamicArray {
     void pop(){
         if(length == 0){ return; }
         length -= 1;
+		data[length].~T();
     }
+	
+	
+	void insert(isize idx, T const& e){
+		assert(idx >= 0 && idx <= length, "Out of bounds insertion to dynamic array");
+		if(length >= capacity){
+			resize(align_forward((length * 2) + 1, alignof(T)));
+		}
+		
+		mem_copy(&data[idx + 1], &data[idx], sizeof(T) * (length - idx));
+		length += 1;
+		data[idx] = e;
+	}
+	
+	void remove(isize idx){
+		assert(idx >= 0 && idx < length, "Out of bounds insertion to dynamic array");
+		data[idx].~T();
+		
+		mem_copy(&data[idx], &data[idx + 1], sizeof(T) * (length - idx));
+		length -= 1;
+	}
+
+	void clear(){
+		for(isize i = 0; i < length; i += 1){
+			isize pos = length - (i + 1);
+			data[pos].~T();
+		}
+		length = 0;
+	}
 
     T& operator[](isize idx){
         assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
@@ -447,8 +476,9 @@ struct DynamicArray {
 		return length;
 	}
 	
-isize cap() const }
-
+	isize cap() const {
+		return capacity;
+	}
 
 	Slice<T> extract(){
 		resize(length);
@@ -462,7 +492,19 @@ isize cap() const }
 		arr.allocator = allocator;
 		return arr;
 	}
+	
+	void dealloc(){
+		clear();
+		allocator.free(arr.data);
+		data = nullptr;
+		capacity = 0;
+	}
 };
+
+template<typename T>
+void destroy(DynamicArray<T> arr){
+	arr.dealloc();
+}
 
 #pragma region Tests
 struct Test {
@@ -537,25 +579,43 @@ void test_arena(){
 		t.expect(p == nullptr);
 	}
 }
-#pragma endregion
 
 void test_dynamic_array(){
+	// TODO, use .expect once we have string formatting
 	auto t = Test::create("Dynamic Array");
 	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
 	
 	constexpr auto print_arr = [](DynamicArray<i32> a){
-		print("cap:", a.cap(), "len:", a.len());
+		print("cap:", a.cap(), "len:", a.size());
 		for(isize i = 0; i < a.size(); i += 1){
 			std::cout << a[i] << ' ';
 		}
 		print("");
 	};
 	
+	print_arr(arr);
 	arr.append(6);
 	arr.append(9);
 	print_arr(arr);
-	
+	arr.insert(0, 4);
+	arr.insert(1, 2);
+	arr.insert(2, 0);
+	print_arr(arr);
+	arr.remove(arr.size() - 1);
+	arr.remove(3);
+	print_arr(arr);
+	arr.remove(0);
+	print_arr(arr);
+	arr.remove(0);
+	arr.remove(0);
+	print_arr(arr);
+	arr.insert(0, 69);
+	arr.insert(0, 420);
+	print_arr(arr);
+
 }
+#pragma endregion
+
 
 int main(void) {
 	test_arena();
