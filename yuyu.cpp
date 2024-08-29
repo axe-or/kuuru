@@ -1,7 +1,8 @@
 // cflags = -O0 -fPIC -pipe -Wall -Wextra
-#include <cstdio>
-#include <cstddef>
-#include <cstdint>
+#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdatomic.h>
 #include <new>
 
 #pragma region Prelude
@@ -29,37 +30,37 @@ static_assert(sizeof(isize) == sizeof(usize), "Mismatched size types");
 
 template<typename T>
 T min(T a, T b){
-    return (a < b) ? a : b;
+	return (a < b) ? a : b;
 }
 
 template<typename T>
 T max(T a, T b){
-    return (a > b) ? a : b;
+	return (a > b) ? a : b;
 }
 
 template<typename T, typename... Args>
 T min(T a, T b, Args&& ...rest){
-    if(a < b){
-        return min(a, rest...);
-    }
-    else {
-        return min(b, rest...);
-    }
+	if(a < b){
+		return min(a, rest...);
+	}
+	else {
+		return min(b, rest...);
+	}
 }
 
 template<typename T, typename... Args>
 T max(T a, T b, Args&& ...rest){
-    if(a > b){
-        return max(a, rest...);
-    }
-    else {
-        return max(b, rest...);
-    }
+	if(a > b){
+		return max(a, rest...);
+	}
+	else {
+		return max(b, rest...);
+	}
 }
 
 template<typename T>
 T clamp(T lo, T x, T hi){
-    return min(max(lo, x), hi);
+	return min(max(lo, x), hi);
 }
 
 namespace _defer_impl {
@@ -91,21 +92,33 @@ namespace _defer_impl {
 #include <iostream> /* DEBUG ONLY. DON'T USE iostream, IT SUCKS. */
 
 void assert(bool cond, cstring msg){
-    if(!cond){
-        std::fprintf(stderr, "Assert failed: %s\n", msg);
-        throw "FAILED ASSERT";
-    }
+	if(!cond){
+		std::fprintf(stderr, "Assert failed: %s\n", msg);
+		throw "FAILED ASSERT";
+	}
+}
+
+[[noreturn]]
+void unimplemented(cstring msg = ""){
+	std::fprintf(stderr, "Unimplemented code: %s\n", msg);
+	throw "UNIMPLEMENTED";
+}
+
+[[noreturn]]
+void panic(cstring msg){
+	std::fprintf(stderr, "Panic: %s\n", msg);
+	throw "PANIC";
 }
 
 template<typename T>
 void print(T x){
-    std::cout << x << '\n';
+	std::cout << x << '\n';
 }
 
 template<typename T, typename ...Args>
 void print(T x, Args&& ...args){
-    std::cout << x << ' ';
-    print(args...);
+	std::cout << x << ' ';
+	print(args...);
 }
 #pragma endregion
 
@@ -113,15 +126,15 @@ void print(T x, Args&& ...args){
 using Align = decltype(alignof(int));
 
 void mem_copy(void* dest, void const* src, isize nbytes){
-    __builtin_memmove(dest, src, nbytes);
+	__builtin_memmove(dest, src, nbytes);
 }
 
 void mem_copy_no_overlap(void* dest, void const* src, isize nbytes){
-    __builtin_memcpy(dest, src, nbytes);
+	__builtin_memcpy(dest, src, nbytes);
 }
 
 void mem_set(void* dest, byte val, isize nbytes){
-    __builtin_memset(dest, val, nbytes);
+	__builtin_memset(dest, val, nbytes);
 }
 
 void mem_zero(void* dest, isize nbytes){
@@ -129,19 +142,19 @@ void mem_zero(void* dest, isize nbytes){
 }
 
 bool valid_alignment(Align align){
-    return (align != 0) && ((align & (align - 1)) == 0);
+	return (align != 0) && ((align & (align - 1)) == 0);
 }
 
 uintptr align_forward(uintptr n, Align align){
-    assert(valid_alignment(align), "Invalid memory alignment");
-    uintptr mod = n & (uintptr(align) - 1);
+	assert(valid_alignment(align), "Invalid memory alignment");
+	uintptr mod = n & (uintptr(align) - 1);
 	uintptr aligned = n;
 
-    if(mod != 0){
-        aligned = n + (align - mod);
-    }
+	if(mod != 0){
+		aligned = n + (align - mod);
+	}
 
-    return aligned;
+	return aligned;
 }
 
 // Allocator interface
@@ -167,28 +180,28 @@ struct Allocator {
 		Free_All  = 1 << 2, // Supports free all
 		Align_Any = 1 << 3, // Supports arbitrary alignment
 	};
-	
+
 	Allocator::Func fn_ = nullptr;
 	void* impl_ = nullptr;
-	
+
 	void* alloc(isize nbytes, Align align){
 		return fn_(Operation::Alloc, impl_, nbytes, align, nullptr, nullptr);
 	}
-	
+
 	void free(void const* ptr){
 		fn_(Operation::Free, impl_, 0, 0, ptr, nullptr);
 	}
-	
+
 	void free_all(void){
 		fn_(Operation::Free_All, impl_, 0, 0, nullptr, nullptr);
 	}
-	
+
 	i32 capabilities(void){
 		i32 cap = 0;
 		fn_(Operation::Query, impl_, 0, 0, nullptr, &cap);
 		return cap;
 	}
-	
+
 	static Allocator from(void* impl, Allocator::Func fn){
 		Allocator a;
 		a.fn_ = fn;
@@ -222,44 +235,45 @@ void free_all(Allocator a){
 template<typename T>
 struct Slice {
 private:
-    T* data = nullptr;
-    isize length = 0;
+	T* data = nullptr;
+	isize length = 0;
 
 public:
-    T& operator[](isize idx){
-        assert(idx >= 0 && idx < length, "Out of bounds access to slice");
-        return data[idx];
-    }
+	T& operator[](isize idx){
+		assert(idx >= 0 && idx < length, "Out of bounds access to slice");
+		return data[idx];
+	}
 
-    T const& operator[](isize idx) const {
-        assert(idx >= 0 && idx < length, "Out of bounds access to slice");
-        return data[idx];
-    }
+	T const& operator[](isize idx) const {
+		assert(idx >= 0 && idx < length, "Out of bounds access to slice");
+		return data[idx];
+	}
 
-    Slice<T> sub(isize start, isize end){
-        assert(start <= end && start >= 0 && end >= 0, "Invalid range for slice");
-        return Slice<T>::from(&data[start], end - start);
-    }
+	Slice<T> sub(isize start, isize end){
+		assert(start <= end && start >= 0 && end >= 0, "Invalid range for slice");
+		return Slice<T>::from(&data[start], end - start);
+	}
 
-    void reset() {
-        data = nullptr;
-        length = 0;
-    }
+	void reset() {
+		data = nullptr;
+		length = 0;
+	}
 
-    bool empty() const {
-        return (length == 0) || (data == nullptr);
-    }
+	bool empty() const {
+		return (length == 0) || (data == nullptr);
+	}
 
-    isize size() const { return length; }
+	isize size() const { return length; }
 
-    T* raw_data() const { return data; }
+	T* raw_data() const { return data; }
 
-    static Slice<T> from(T* ptr, isize n){
-        Slice<T> s;
-        s.data = ptr;
-        s.length = n;
-        return s;
-    }
+	static Slice<T> from(T* ptr, isize n){
+        assert(n >= 0, "Invalid size");
+		Slice<T> s;
+		s.data = ptr;
+		s.length = n;
+		return s;
+	}
 };
 
 template<typename T> [[nodiscard]]
@@ -278,6 +292,123 @@ void destroy(Slice<T> s, Allocator allocator){
 	}
 	allocator.free(s.raw_data());
 }
+
+template<typename T>
+struct DynamicArray {
+	T* data = nullptr;
+	isize capacity = 0;
+	isize length = 0;
+	Allocator allocator = {0};
+
+	void resize(isize new_cap){
+		T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
+		assert(new_data != nullptr, "Failed allocation");
+
+		if(data != nullptr){
+			mem_copy(new_data, data, sizeof(T) * length);
+		}
+
+		if(new_cap > length){
+			mem_zero(&new_data[length], (new_cap - length) * sizeof(T));
+		}
+		allocator.free(data);
+
+		length = min(new_cap, length);
+		capacity = new_cap;
+		data = new_data;
+	}
+
+	void append(T const& e){
+		if(length >= capacity){
+			resize(align_forward((length * 2) + 1, alignof(T)));
+		}
+
+		data[length] = e;
+		length += 1;
+	}
+
+	void pop(){
+		if(length == 0){ return; }
+		length -= 1;
+		data[length].~T();
+	}
+
+
+	void insert(isize idx, T const& e){
+		assert(idx >= 0 && idx <= length, "Out of bounds insertion to dynamic array");
+		if(idx == length){
+			return append(e);
+		}
+
+		if(length >= capacity){
+			resize(align_forward((length * 2) + 1, alignof(T)));
+		}
+
+		mem_copy(&data[idx + 1], &data[idx], sizeof(T) * (length - idx));
+		length += 1;
+		data[idx] = e;
+	}
+
+	void remove(isize idx){
+		assert(idx >= 0 && idx < length, "Out of bounds insertion to dynamic array");
+		data[idx].~T();
+
+		mem_copy(&data[idx], &data[idx + 1], sizeof(T) * (length - idx));
+		length -= 1;
+	}
+
+	void clear(){
+		for(isize i = 0; i < length; i += 1){
+			isize pos = length - (i + 1);
+			data[pos].~T();
+		}
+		length = 0;
+	}
+
+	T& operator[](isize idx){
+		assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
+		return data[idx];
+	}
+
+	T const& operator[](isize idx) const {
+		assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
+		return data[idx];
+	}
+
+	isize size() const {
+		return length;
+	}
+
+	isize cap() const {
+		return capacity;
+	}
+	
+	// Create a clone of the array's current items using allocator.
+	Slice<T> build_slice(Allocator allocator){
+		auto s = make_slice<T>(allocator);
+		mem_copy_no_overlap(s.raw_data(), data, length * sizeof(T));
+		return s;
+	}
+
+	static DynamicArray create(Allocator allocator){
+		DynamicArray arr;
+		arr.allocator = allocator;
+		return arr;
+	}
+
+	void dealloc(){
+		clear();
+		allocator.free(data);
+		data = nullptr;
+		capacity = 0;
+	}
+};
+
+template<typename T>
+void destroy(DynamicArray<T> arr){
+	arr.dealloc();
+}
+
 #pragma endregion
 
 #pragma region Allocators
@@ -309,7 +440,7 @@ struct HeapAllocator {
 			case O::Free:
 				HeapAllocator::free(ptr);
 			break;
-	
+
 			case O::Free_All: break;
 
 			case O::Query:
@@ -317,13 +448,13 @@ struct HeapAllocator {
 				*query_res = i32(C::Alloc_Any) | i32(C::Free_Any) | i32(C::Align_Any);
 			break;
 		}
-		
+
 		return nullptr;
 
 	}
-	
+
 	static Allocator get(){
-        return Allocator::from(nullptr, _allocator_func);
+		return Allocator::from(nullptr, _allocator_func);
 	}
 };
 
@@ -359,155 +490,38 @@ struct Arena {
 		a.capacity = buf.size();
 		return a;
 	}
-	
+
 	static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
 		using O = Allocator::Operation;
-		
+
 		auto self = (Arena*)(impl);
-        (void)ptr;
-		
+		(void)ptr;
+
 		switch(op){
 			case O::Alloc:
 				return self->alloc(size, align);
 			break;
-			
+
 			case O::Free: break;
-			
+
 			case O::Free_All:
 				self->free_all();
 			break;
-			
+
 			case O::Query:
 				using C = Allocator::Capability;
 				*query_res = i32(C::Alloc_Any) | i32(C::Free_All) | i32(C::Align_Any);
 			break;
 		}
-		
+
 		return nullptr;
 	}
-	
+
 	Allocator allocator(){
 		return Allocator::from((void*)(this), _allocator_func);
 	}
 };
-
 #pragma endregion
-
-template<typename T>
-struct DynamicArray {
-    T* data = nullptr;
-    isize capacity = 0;
-    isize length = 0;
-	Allocator allocator = {0};
-
-    void resize(isize new_cap){
-        T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
-		assert(new_data != nullptr, "Failed allocation");
-
-		if(data != nullptr){
-			mem_copy(new_data, data, sizeof(T) * length);
-		}
-		
-		if(new_cap > length){
-			mem_zero(&new_data[length], (new_cap - length) * sizeof(T));
-		}
-        allocator.free(data);
-
-		length = min(new_cap, length);
-        capacity = new_cap;
-        data = new_data;
-    }
-
-    void append(T const& e){
-        if(length >= capacity){
-            resize(align_forward((length * 2) + 1, alignof(T)));
-        }
-
-        data[length] = e;
-        length += 1;
-    }
-
-    void pop(){
-        if(length == 0){ return; }
-        length -= 1;
-		data[length].~T();
-    }
-	
-	
-	void insert(isize idx, T const& e){
-		assert(idx >= 0 && idx <= length, "Out of bounds insertion to dynamic array");
-		if(idx == length){
-			return append(e);
-		}
-		
-		if(length >= capacity){
-			resize(align_forward((length * 2) + 1, alignof(T)));
-		}
-
-		mem_copy(&data[idx + 1], &data[idx], sizeof(T) * (length - idx));
-		length += 1;
-		data[idx] = e;
-	}
-	
-	void remove(isize idx){
-		assert(idx >= 0 && idx < length, "Out of bounds insertion to dynamic array");
-		data[idx].~T();
-		
-		mem_copy(&data[idx], &data[idx + 1], sizeof(T) * (length - idx));
-		length -= 1;
-	}
-
-	void clear(){
-		for(isize i = 0; i < length; i += 1){
-			isize pos = length - (i + 1);
-			data[pos].~T();
-		}
-		length = 0;
-	}
-
-    T& operator[](isize idx){
-        assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
-        return data[idx];
-    }
-
-    T const& operator[](isize idx) const {
-        assert(idx >= 0 && idx < length, "Out of bounds access to dynamic array");
-        return data[idx];
-    }
-	
-	isize size() const {
-		return length;
-	}
-	
-	isize cap() const {
-		return capacity;
-	}
-
-	Slice<T> extract(){
-		resize(length);
-		auto s = Slice<T>::from(data, length);
-		data = nullptr;
-		length = 0;
-	}
-	
-	static DynamicArray create(Allocator allocator){
-		DynamicArray arr;
-		arr.allocator = allocator;
-		return arr;
-	}
-	
-	void dealloc(){
-		clear();
-		allocator.free(data);
-		data = nullptr;
-		capacity = 0;
-	}
-};
-
-template<typename T>
-void destroy(DynamicArray<T> arr){
-	arr.dealloc();
-}
 
 #pragma region Tests
 struct Test {
@@ -546,7 +560,7 @@ void test_arena(){
 	auto buf = make_slice<byte>(128, heap_alloc);
 	defer(destroy(buf, heap_alloc));
 	auto arena = Arena::from(buf);
-    auto allocator = arena.allocator();
+	auto allocator = arena.allocator();
 	{
 		auto old_offset = arena.offset;
 		(void) make<i32>(allocator);
@@ -588,7 +602,7 @@ void test_dynamic_array(){
 	auto t = Test::create("Dynamic Array");
 	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
 	defer(destroy(arr));
-	
+
 	constexpr auto print_arr = [](DynamicArray<i32> a){
 		print("cap:", a.cap(), "len:", a.size());
 		for(isize i = 0; i < a.size(); i += 1){
@@ -596,7 +610,7 @@ void test_dynamic_array(){
 		}
 		print("");
 	};
-	
+
 	print_arr(arr);
 	arr.append(6);
 	arr.append(9);
@@ -621,8 +635,97 @@ void test_dynamic_array(){
 }
 #pragma endregion
 
+#pragma region String
+isize cstring_len(cstring cstr){
+	constexpr isize MAX_CSTR_LEN = (~i32(0)) >> i32(1);
+	for(isize i = 0; i < MAX_CSTR_LEN; i += 1){
+		if(cstr[i] == 0){
+			return i;
+		}
+	}
+	return MAX_CSTR_LEN;
+}
+
+struct string {
+	byte const* data = nullptr;
+	isize length = 0;
+	
+	
+	// Implicit constructor
+	string(cstring cs){
+		*this = string::from_cstring(cs);
+	}
+	
+	string(){}
+	
+	static string from_cstring(cstring cstr){
+		return from_cstring(cstr, cstring_len(cstr));
+	}
+	
+	static string from_cstring(cstring cstr, isize length){
+		string s;
+		s.data = (byte const *)(cstr);
+		s.length = length;
+		return s;
+	}
+};
+
+rune utf8_decode(Slice<byte> b){
+}
+
+
+#pragma endregion
+
+template<typename T, isize N>
+struct Array {
+    T data[N];
+
+    T& operator[](isize idx){
+   		assert(idx >= 0 && idx < N, "Out of bounds access to array");
+        return data[idx];
+    }
+
+    T const& operator[](isize idx) const {
+   		assert(idx >= 0 && idx < N, "Out of bounds access to array");
+        return data[idx];
+    }
+
+    isize size() const {
+        return N;
+    }
+
+    Slice<T> sub(isize start, isize end){
+        return Slice<T>::from(&data[start], end - start);
+    }
+};
+
+/* Auto generated array operations */ namespace {
+template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a + b; } return c; } 
+template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a - b; } return c; } 
+template<typename T, isize N> constexpr auto operator*(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a * b; } return c; } 
+template<typename T, isize N> constexpr auto operator/(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a / b; } return c; } 
+template<typename T, isize N> constexpr auto operator%(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a % b; } return c; } 
+template<typename T, isize N> constexpr auto operator&(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a & b; } return c; } 
+template<typename T, isize N> constexpr auto operator|(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a | b; } return c; } 
+template<typename T, isize N> constexpr auto operator^(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a ^ b; } return c; } 
+template<typename T, isize N> constexpr auto operator<<(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a << b; } return c; } 
+template<typename T, isize N> constexpr auto operator>>(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a >> b; } return c; } 
+template<typename T, isize N> constexpr auto operator&&(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a && b; } return c; } 
+template<typename T, isize N> constexpr auto operator||(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a || b; } return c; } 
+template<typename T, isize N> constexpr auto operator==(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a == b; } return c; } 
+template<typename T, isize N> constexpr auto operator!=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a != b; } return c; } 
+template<typename T, isize N> constexpr auto operator>(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a > b; } return c; } 
+template<typename T, isize N> constexpr auto operator>=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a >= b; } return c; } 
+template<typename T, isize N> constexpr auto operator<(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a < b; } return c; } 
+template<typename T, isize N> constexpr auto operator<=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a <= b; } return c; } 
+template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = + a; } return c; } 
+template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = - a; } return c; } 
+template<typename T, isize N> constexpr auto operator~(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = ~ a; } return c; } 
+template<typename T, isize N> constexpr auto operator!(Array<T, N> const& a){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = ! a; } return c; } 
+}
+
 int main(void) {
-	test_arena();
-	test_dynamic_array();
-    return 0;
+	// test_arena();
+	// test_dynamic_array();
+	return 0;
 }
