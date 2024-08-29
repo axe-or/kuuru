@@ -403,10 +403,9 @@ struct DynamicArray {
     void resize(isize new_cap){
         T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
 		assert(new_data != nullptr, "Failed allocation");
-        isize nbytes = sizeof(T) * new_cap;
 
 		if(data != nullptr){
-			mem_copy(new_data, data, nbytes);
+			mem_copy(new_data, data, sizeof(T) * length);
 		}
 		
 		if(new_cap > length){
@@ -437,10 +436,14 @@ struct DynamicArray {
 	
 	void insert(isize idx, T const& e){
 		assert(idx >= 0 && idx <= length, "Out of bounds insertion to dynamic array");
+		if(idx == length){
+			return append(e);
+		}
+		
 		if(length >= capacity){
 			resize(align_forward((length * 2) + 1, alignof(T)));
 		}
-		
+
 		mem_copy(&data[idx + 1], &data[idx], sizeof(T) * (length - idx));
 		length += 1;
 		data[idx] = e;
@@ -495,7 +498,7 @@ struct DynamicArray {
 	
 	void dealloc(){
 		clear();
-		allocator.free(arr.data);
+		allocator.free(data);
 		data = nullptr;
 		capacity = 0;
 	}
@@ -584,6 +587,7 @@ void test_dynamic_array(){
 	// TODO, use .expect once we have string formatting
 	auto t = Test::create("Dynamic Array");
 	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
+	defer(destroy(arr));
 	
 	constexpr auto print_arr = [](DynamicArray<i32> a){
 		print("cap:", a.cap(), "len:", a.size());
@@ -599,7 +603,9 @@ void test_dynamic_array(){
 	print_arr(arr);
 	arr.insert(0, 4);
 	arr.insert(1, 2);
+
 	arr.insert(2, 0);
+
 	print_arr(arr);
 	arr.remove(arr.size() - 1);
 	arr.remove(3);
@@ -612,10 +618,8 @@ void test_dynamic_array(){
 	arr.insert(0, 69);
 	arr.insert(0, 420);
 	print_arr(arr);
-
 }
 #pragma endregion
-
 
 int main(void) {
 	test_arena();
