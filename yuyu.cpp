@@ -644,7 +644,7 @@ bool is_utf16_surrogate(rune r){
 pair<Array<byte, 4>, i32> encode(rune r){
 	int n = 0;
 	Array<byte, 4> bytes = {0};
-	
+
 	if(is_utf16_surrogate(r) || r < 0 || r > range_4){
 		return {error_rune_encoded, 0};
 	}
@@ -727,6 +727,37 @@ pair<rune, i32> decode(Slice<byte> s){
 	return {codepoint, len};
 }
 
+struct Iterator {
+	Slice<byte> data;
+	isize current = 0;
+
+	pair<rune, i32> next(){
+        if(current >= data.size()){
+			return {0, 0};
+		}
+		auto res = utf8::decode(data.sub(current, data.size()));
+		current += res.b;
+
+		return res;
+	}
+	
+	// BEWARE: C++ insanity below. This iterator is unlike the C++ crazy pointer shit with operator overloading.
+	// Instead we do a simple .next() method that returns a zero value indicating the end of iteration.
+	// So why have this? so we can do a for-each style loop on, I believe that the utility provided by at least
+	// being able to do a for-each loop is enough to counteract the horrible mess this is. Do **NOT** try to use this
+	// as a "regular" C++ iterator, it was *specifically* made for 1 particular syntax sugar.
+	void operator++(){}
+
+	auto operator*(){
+		return next();
+	}
+
+	bool operator!=(Iterator rhs){
+		return current != rhs.current;
+	}
+	// END OF INSANITY
+};
+
 }/* namespace utf8 */
 
 struct string {
@@ -747,7 +778,7 @@ struct string {
 		s.length = bytes.size();
 		return s;
 	}
-	
+
 	static string from_cstring(cstring cstr){
 		return from_cstring(cstr, cstring_len(cstr));
 	}
@@ -758,19 +789,31 @@ struct string {
 		s.length = length;
 		return s;
 	}
-	
+
 	isize size() const { return length; }
-	
+
 	byte const* raw_data() const { return data; }
-	
+
 	bool operator==(string b){
 		if(length != b.length){ return false; }
-		
+
 		for(isize i = 0; i < length; i += 1){
 			if(data[i] != b.data[i]){ return false; }
 		}
-		
+
 		return true;
+	}
+	
+	utf8::Iterator begin() const {
+		utf8::Iterator it;
+		it.data = Slice<byte>::from((byte*)(data), length);
+		return it;
+	}
+	
+	utf8::Iterator end() const {
+		utf8::Iterator it;
+		it.current = length;
+		return it;
 	}
 };
 #pragma endregion
@@ -923,6 +966,11 @@ void test_utf8(){
 
 
 int main(void) {
+
+    string s = "Olá 世界";
+    for(auto [r, n] : s){
+        print(r, n);
+    }
 	// test_arena();
 	// test_dynamic_array();
 	// test_utf8();
