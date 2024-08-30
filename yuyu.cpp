@@ -274,7 +274,7 @@ public:
 		}
 		return data[idx];
 	}
-	
+
 	Slice<T> sub(isize start, isize end){
 		assert(start <= end && start >= 0 && end >= 0, "Invalid range for slice");
 		return Slice<T>::from(&data[start], end - start);
@@ -336,7 +336,7 @@ struct Array {
     isize size() const {
         return N;
     }
-	
+
 	Slice<T> sub(){
 		return Slice<T>::from(data, N);
 	}
@@ -347,27 +347,27 @@ struct Array {
 };
 
 /* Auto generated array operations */ namespace {
-	template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] + b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] - b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator*(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] * b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator/(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] / b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator%(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] % b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator&(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] & b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator|(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] | b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator^(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] ^ b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator<<(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] << b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator>>(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] >> b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator&&(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] && b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator||(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] || b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator==(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] == b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator!=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] != b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator>(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] > b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator>=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] >= b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator<(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] < b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator<=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] <= b.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = + a.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = - a.data[i]; } return c; } 
-	template<typename T, isize N> constexpr auto operator~(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = ~ a.data[i]; } return c; } 
+	template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] + b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] - b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator*(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] * b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator/(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] / b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator%(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] % b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator&(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] & b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator|(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] | b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator^(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] ^ b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator<<(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] << b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator>>(Array<T, N> const& a, Array<T, N> const& b){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] >> b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator&&(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] && b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator||(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] || b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator==(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] == b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator!=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] != b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator>(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] > b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator>=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] >= b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator<(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] < b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator<=(Array<T, N> const& a, Array<T, N> const& b){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = a.data[i] <= b.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator+(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = + a.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator-(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = - a.data[i]; } return c; }
+	template<typename T, isize N> constexpr auto operator~(Array<T, N> const& a){ Array<T, N> c; for(isize i = 0; i < N; i++){ c[i] = ~ a.data[i]; } return c; }
 	template<typename T, isize N> constexpr auto operator!(Array<T, N> const& a){ Array<bool, N> c; for(isize i = 0; i < N; i++){ c[i] = ! a.data[i]; } return c; }
 }
 
@@ -460,7 +460,7 @@ struct DynamicArray {
 	isize cap() const {
 		return capacity;
 	}
-	
+
 	// Create a clone of the array's current items using allocator.
 	Slice<T> build_slice(Allocator allocator){
 		auto s = make_slice<T>(allocator);
@@ -715,7 +715,7 @@ void test_dynamic_array(){
 
 #pragma region String
 isize cstring_len(cstring cstr){
-	constexpr isize MAX_CSTR_LEN = (~i32(0)) >> i32(1);
+	constexpr isize MAX_CSTR_LEN = isize(~u32(0) >> u32(1));
 	for(isize i = 0; i < MAX_CSTR_LEN; i += 1){
 		if(cstr[i] == 0){
 			return i;
@@ -727,36 +727,58 @@ isize cstring_len(cstring cstr){
 struct string {
 	byte const* data = nullptr;
 	isize length = 0;
-	
-	
+
 	// Implicit constructor
 	string(cstring cs){
-		*this = string::from_cstring(cs);
+		data = (byte const *)(cs);
+		length = cstring_len(cs);
 	}
-	
+
 	string(){}
+
+	static string from_bytes(Slice<byte> bytes){
+		string s;
+		s.data = bytes.raw_data();
+		s.length = bytes.size();
+		return s;
+	}
 	
 	static string from_cstring(cstring cstr){
 		return from_cstring(cstr, cstring_len(cstr));
 	}
-	
+
 	static string from_cstring(cstring cstr, isize length){
 		string s;
 		s.data = (byte const *)(cstr);
 		s.length = length;
 		return s;
 	}
+	
+	isize size() const { return length; }
+	
+	byte const* raw_data() const { return data; }
+	
+	bool operator==(string b){
+		if(length != b.length){ return false; }
+		
+		for(isize i = 0; i < length; i += 1){
+			if(data[i] != b.data[i]){ return false; }
+		}
+		
+		return true;
+	}
 };
- 
+
+ namespace utf8 {
 constexpr auto surrogate_range = Array<rune, 2>{0xd800, 0xdfff};
 constexpr auto continuation_range = Array<byte, 2>{0x80, 0xbf};
 
-constexpr rune utf8_error = 0xfffd;
+constexpr rune error_rune = 0xfffd;
 
-constexpr rune utf8_range1 = 0x7f;
-constexpr rune utf8_range2 = 0x7ff;
-constexpr rune utf8_range3 = 0xffff;
-constexpr rune utf8_range4 = 0x10ffff;
+constexpr rune range_1 = 0x7f;
+constexpr rune range_2 = 0x7ff;
+constexpr rune range_3 = 0xffff;
+constexpr rune range_4 = 0x10ffff;
 
 constexpr rune mask_2 = 0x1f; /* 0001_1111 */
 constexpr rune mask_3 = 0x0f; /* 0000_1111 */
@@ -770,43 +792,43 @@ constexpr rune size_4 = 0xf0; /* 1111_0xxx */
 
 constexpr rune cont = 0x80; /* 10xx_xxxx */
 
-pair<Array<byte, 4>, i32> utf8_encode(rune r){
+pair<Array<byte, 4>, i32> encode(rune r){
 	// TODO: Prevent invalid codepoints
 	int n = 0;
 	Array<byte, 4> bytes = {0};
-	
-	if(r <= utf8_range1){
+
+	if(r <= range_1){
 		n = 1;
 		bytes[0] = r;
 	}
-	else if(r <= utf8_range2){
+	else if(r <= range_2){
 		n = 2;
 		bytes[0] = size_2 | ((r >> 6) & mask_2);
 		bytes[1] = cont   | ((r >> 0) & mask_x);
 	}
-	else if(r <= utf8_range3){
+	else if(r <= range_3){
 		n = 3;
 		bytes[0] = size_3 | ((r >> 12) & mask_3);
 		bytes[1] = cont   | ((r >> 6) & mask_x);
 		bytes[2] = cont   | ((r >> 0) & mask_x);
 	}
-	else if(r <= utf8_range4){
+	else if(r <= range_4){
 		n = 4;
 		bytes[0] = size_4 | ((r >> 18) & mask_4);
 		bytes[1] = cont   | ((r >> 12) & mask_x);
 		bytes[2] = cont   | ((r >> 6)  & mask_x);
 		bytes[3] = cont   | ((r >> 0)  & mask_x);
 	}
-	return res;
+	return {bytes, n};
 }
 
-pair<rune, i32> utf8_decode(Slice<byte> s){
-	constexpr pair<rune, i32> decode_error = {utf8_error, 0};
+pair<rune, i32> decode(Slice<byte> s){
+	constexpr pair<rune, i32> decode_error = {error_rune, 0};
 	if(s.empty()){ return decode_error; }
 
 	auto buf = s.raw_data();
 	u8 first = buf[0];
-	
+
 	i32 len = 0;
 	rune codepoint = 0;
 
@@ -853,16 +875,46 @@ pair<rune, i32> utf8_decode(Slice<byte> s){
 	return {codepoint, len};
 }
 
-
-
+}
 #pragma endregion
+
+void test_utf8(){
+	auto t = Test::create("UTF-8");
+	const rune codepoints[] = {
+		0x0024,  /* $ */
+		0x0418,  /* И */
+		0xd55c,  /* 한 */
+		0x10348, /* 𐍈 */
+	};
+	const cstring encoded[] = {"$", "И", "한", "𐍈"};
+
+	isize const N = (sizeof(codepoints) / sizeof(rune));
+
+	for(isize i = 0; i < N; i += 1){
+		auto [bytes, len] = utf8::encode(codepoints[i]);
+		t.expect(len == i + 1);
+
+		auto a = string::from_bytes(bytes.sub(0, len));
+		auto b = string::from_cstring(encoded[i]);
+
+		t.expect(a == b);
+	}
+
+	for(isize i = 0; i < N; i += 1){
+		auto s = Slice<byte>::from((byte *)encoded[i], cstring_len(encoded[i]));
+		auto [codepoint, len] = utf8::decode(s);
+		t.expect(len == i + 1);
+
+		rune a = codepoints[i];
+		rune b = codepoint;
+		t.expect(a == b);
+	}
+
+}
 
 int main(void) {
 	// test_arena();
 	// test_dynamic_array();
-	auto a = Array<f32, 4>{1.3, -4.0, 3.2, 1};
-	auto b = Array<f32, 4>{2, 4.0, -6.5, 5};
-    auto c = a == b;
-	print_arr(c);
+	test_utf8();
 	return 0;
 }
