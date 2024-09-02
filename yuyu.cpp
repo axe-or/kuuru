@@ -1057,6 +1057,10 @@ void test_utf8(){
 #pragma endregion
 
 
+struct Lexer {
+	utf8::Iterator source;
+};
+
 int main(void) {
     string s = "Olá 世界";
     for(auto [r, n] : s){
