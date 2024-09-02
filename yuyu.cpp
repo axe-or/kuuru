@@ -98,6 +98,28 @@ namespace _defer_impl {
 
 #pragma endregion
 
+#pragma region C++
+// C++ Insanity. This namespace is dedicated to barney's starsoup horrid language design.
+// Most of the things here are so we can access certain language features that unfortunately require
+// some adherence to cognitive decline. E.g.: foreach loops require stupid iterator stuff.
+// Do NOT rely on anything that has cpp:: on it.
+namespace cpp {
+
+	struct Error {
+			cstring msg = "";
+		cstring what() const {
+			return msg;
+		}
+	};
+	
+	void raise_error(cstring msg){
+		Error e;
+		e.msg = msg;
+		throw e;
+	}
+}
+#pragma endregion
+
 #pragma region Debug
 #include <iostream> /* DEBUG ONLY. DON'T USE iostream, IT SUCKS. */
 
@@ -318,6 +340,76 @@ void destroy(Slice<T> s, Allocator allocator){
 	}
 	allocator.free(s.raw_data());
 }
+
+template<typename T>
+struct Option {
+	union {
+		T data;
+	};
+	bool has_value = false;
+	
+	T get(){
+		if(!has_value){
+			panic("Cannot get() from empty option");
+		}
+		return data;
+	}
+	
+	T get_or(T const& v){
+		if(!has_value){
+			return v;
+		}
+		return data;
+	}
+	
+	bool ok() const {
+		return has_value;
+	}
+	
+	void operator=(T const& e){
+		reset(e);
+	}
+	
+	void operator=(Option<T> const& opt){
+		if(opt.has_value){
+			reset(opt.data);
+		}
+	}
+	
+	static Option from(T const& e){
+		Option<T> opt;
+		opt.reset(e);
+		return opt;
+	}
+	
+	static Option none(){
+		return Option<T>{};
+	}
+
+	void reset(T const& e){
+		if(has_value){
+			data = e;
+		} else {
+			new (&data) T(e);
+		}
+		has_value = true;
+	}
+	
+	void reset(){
+		if(has_value){
+			data.~T();
+		}
+		has_value = false;
+	}
+	
+	Option(){}
+	
+	Option(Option<T> const& opt) : data(opt.data), has_value(opt.has_value) {}
+	
+	~Option(){
+		reset();
+	}
+};
 
 template<typename T, isize N>
 struct Array {
@@ -601,7 +693,6 @@ struct Arena {
 };
 #pragma endregion
 
-
 #pragma region String
 isize cstring_len(cstring cstr){
 	constexpr isize MAX_CSTR_LEN = isize(~u32(0) >> u32(1));
@@ -732,7 +823,7 @@ struct Iterator {
 	isize current = 0;
 
 	pair<rune, i32> next(){
-        if(current >= data.size()){
+        if(done()){
 			return {0, 0};
 		}
 		auto res = utf8::decode(data.sub(current, data.size()));
@@ -740,25 +831,26 @@ struct Iterator {
 
 		return res;
 	}
-	
-	// BEWARE: C++ insanity below. This iterator is unlike the C++ crazy pointer shit with operator overloading.
-	// Instead we do a simple .next() method that returns a zero value indicating the end of iteration.
-	// So why have this? so we can do a for-each style loop on, I believe that the utility provided by at least
-	// being able to do a for-each loop is enough to counteract the horrible mess this is. Do **NOT** try to use this
-	// as a "regular" C++ iterator, it was *specifically* made for 1 particular syntax sugar.
-	void operator++(){}
 
-	auto operator*(){
-		return next();
+	bool done() const {
+		return current >= data.size();
 	}
-
-	bool operator!=(Iterator rhs){
-		return current != rhs.current;
-	}
-	// END OF INSANITY
 };
-
 }/* namespace utf8 */
+
+namespace cpp {
+struct UTF8IteratorWrapper : public utf8::Iterator {
+void operator++(){}
+
+auto operator*(){
+	return next();
+}
+
+bool operator!=(UTF8IteratorWrapper rhs){
+	return current != rhs.current;
+}
+};
+} /* namespace cpp */
 
 struct string {
 	byte const* data = nullptr;
@@ -803,15 +895,15 @@ struct string {
 
 		return true;
 	}
-	
-	utf8::Iterator begin() const {
-		utf8::Iterator it;
+
+	auto begin() const {
+		cpp::UTF8IteratorWrapper it;
 		it.data = Slice<byte>::from((byte*)(data), length);
 		return it;
 	}
-	
-	utf8::Iterator end() const {
-		utf8::Iterator it;
+
+	auto end() const {
+		cpp::UTF8IteratorWrapper it;
 		it.current = length;
 		return it;
 	}
@@ -966,13 +1058,10 @@ void test_utf8(){
 
 
 int main(void) {
-
     string s = "Olá 世界";
     for(auto [r, n] : s){
-        print(r, n);
+		auto [encoded, _] = utf8::encode(r);
+		printf("U+%06x %.*s\t%d\n", r, n, encoded.data, n);
     }
-	// test_arena();
-	// test_dynamic_array();
-	// test_utf8();
-	return 0;
+    return 0;
 }
