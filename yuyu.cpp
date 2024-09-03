@@ -38,17 +38,17 @@ struct pair {
 	B b;
 };
 
-template<typename T>
+template<typename T> constexpr
 T min(T a, T b){
 	return (a < b) ? a : b;
 }
 
-template<typename T>
+template<typename T> constexpr
 T max(T a, T b){
 	return (a > b) ? a : b;
 }
 
-template<typename T, typename... Args>
+template<typename T, typename... Args> constexpr
 T min(T a, T b, Args&& ...rest){
 	if(a < b){
 		return min(a, rest...);
@@ -58,7 +58,7 @@ T min(T a, T b, Args&& ...rest){
 	}
 }
 
-template<typename T, typename... Args>
+template<typename T, typename... Args> constexpr
 T max(T a, T b, Args&& ...rest){
 	if(a > b){
 		return max(a, rest...);
@@ -68,9 +68,16 @@ T max(T a, T b, Args&& ...rest){
 	}
 }
 
-template<typename T>
+template<typename T> constexpr
 T clamp(T lo, T x, T hi){
 	return min(max(lo, x), hi);
+}
+
+template<typename T> constexpr
+void swap(T* a, T* b){
+	T tmp = *a;
+	*a = *b;
+	*b = tmp;
 }
 
 namespace _defer_impl {
@@ -82,8 +89,11 @@ namespace _defer_impl {
 	};
 
 	#define CONCAT_0(X, Y) X##Y
+	
 	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
+	
 	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
+	
 	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
 		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
 }
@@ -111,7 +121,7 @@ namespace cpp {
 			return msg;
 		}
 	};
-	
+
 	void raise_error(cstring msg){
 		Error e;
 		e.msg = msg;
@@ -342,46 +352,56 @@ void destroy(Slice<T> s, Allocator allocator){
 }
 
 template<typename T>
+void reverse(Slice<T> s){
+    T* buf = s.raw_data();
+    isize n = s.size();
+
+    for(isize i = 0; i < (n / 2); i += 1){
+        swap(&buf[i], &buf[n - (i + 1)]);
+    }
+}
+
+template<typename T>
 struct Option {
 	union {
 		T data;
 	};
 	bool has_value = false;
-	
+
 	T get(){
 		if(!has_value){
 			panic("Cannot get() from empty option");
 		}
 		return data;
 	}
-	
+
 	T get_or(T const& v){
 		if(!has_value){
 			return v;
 		}
 		return data;
 	}
-	
+
 	bool ok() const {
 		return has_value;
 	}
-	
+
 	void operator=(T const& e){
 		reset(e);
 	}
-	
+
 	void operator=(Option<T> const& opt){
 		if(opt.has_value){
 			reset(opt.data);
 		}
 	}
-	
+
 	static Option from(T const& e){
 		Option<T> opt;
 		opt.reset(e);
 		return opt;
 	}
-	
+
 	static Option none(){
 		return Option<T>{};
 	}
@@ -394,18 +414,18 @@ struct Option {
 		}
 		has_value = true;
 	}
-	
+
 	void reset(){
 		if(has_value){
 			data.~T();
 		}
 		has_value = false;
 	}
-	
+
 	Option(){}
-	
+
 	Option(Option<T> const& opt) : data(opt.data), has_value(opt.has_value) {}
-	
+
 	~Option(){
 		reset();
 	}
@@ -472,6 +492,8 @@ struct DynamicArray {
 
 	void resize(isize new_cap){
 		T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
+		print("Resizing to:", sizeof(T) * new_cap);
+		
 		assert(new_data != nullptr, "Failed allocation");
 
 		if(data != nullptr){
@@ -497,6 +519,15 @@ struct DynamicArray {
 		length += 1;
 	}
 
+	void append_slice(Slice<T> elems){
+		if(length >= capacity){
+			resize(align_forward((length * 2) + elems.size(), alignof(T)));
+		}
+
+		mem_copy(&data[length], elems.raw_data(), elems.size() * sizeof(T));
+		length += elems.size();
+	}
+
 	void pop(){
 		if(length == 0){ return; }
 		length -= 1;
@@ -518,6 +549,7 @@ struct DynamicArray {
 		length += 1;
 		data[idx] = e;
 	}
+
 
 	void remove(isize idx){
 		assert(idx >= 0 && idx < length, "Out of bounds insertion to dynamic array");
@@ -557,6 +589,20 @@ struct DynamicArray {
 	Slice<T> build_slice(Allocator allocator){
 		auto s = make_slice<T>(allocator);
 		mem_copy_no_overlap(s.raw_data(), data, length * sizeof(T));
+		return s;
+	}
+
+	// Returns elements at moment of extraction, this clears the array.
+	Slice<T> extract_slice(){
+		auto s = Slice<T>::from(data, length);
+		data = nullptr;
+		length = 0;
+		capacity = 0;
+		return s;
+	}
+
+	Slice<T> sub(isize start, isize end){
+		auto s = Slice<T>::from(data, length).sub(start, end);
 		return s;
 	}
 
@@ -853,12 +899,14 @@ bool operator!=(UTF8IteratorWrapper rhs){
 } /* namespace cpp */
 
 struct string {
-	byte const* data = nullptr;
+private:
+	byte* data = nullptr;
 	isize length = 0;
 
+public:
 	// Implicit constructor
 	string(cstring cs){
-		data = (byte const *)(cs);
+		data = (byte *)(cs);
 		length = cstring_len(cs);
 	}
 
@@ -877,14 +925,14 @@ struct string {
 
 	static string from_cstring(cstring cstr, isize length){
 		string s;
-		s.data = (byte const *)(cstr);
+		s.data = (byte*)(cstr);
 		s.length = length;
 		return s;
 	}
 
-	isize size() const { return length; }
+	isize size() { return length; }
 
-	byte const* raw_data() const { return data; }
+	byte* raw_data() { return data; }
 
 	bool operator==(string b){
 		if(length != b.length){ return false; }
@@ -894,6 +942,12 @@ struct string {
 		}
 
 		return true;
+	}
+
+	utf8::Iterator iter(){
+		utf8::Iterator it;
+		it.data = Slice<byte>::from((byte*)(data), length);
+		return it;
 	}
 
 	auto begin() const {
@@ -1056,16 +1110,122 @@ void test_utf8(){
 }
 #pragma endregion
 
-
 struct Lexer {
-	utf8::Iterator source;
+	string source = "";
+	utf8::Iterator iter;
+
+	auto advance(){
+		return iter.next();
+	}
+
+	auto done(){
+		return iter.done();
+	}
+
+	static Lexer create(string source){
+		Lexer lex;
+		lex.source = source;
+		lex.iter = source.iter();
+		return lex;
+	}
 };
 
+struct StringBuilder {
+	DynamicArray<byte> data;
+
+	void push_rune(rune r){
+		auto [bytes, n] = utf8::encode(r);
+		data.append_slice(bytes.sub(0, n));
+	}
+
+	void push_string(string s){
+		data.append_slice(Slice<byte>::from(s.raw_data(), s.size()));
+	}
+
+	static auto create(Allocator allocator){
+		StringBuilder sb;
+		sb.data = DynamicArray<byte>::create(allocator);
+		return sb;
+	}
+
+	string build(){
+		data.resize(data.size());
+		auto s = data.extract_slice();
+		return string::from_bytes(s);
+	}
+
+	auto allocator() const {
+		return data.allocator;
+	}
+	
+	void dealloc(){
+		data.dealloc();
+	}
+};
+
+void destroy(StringBuilder sb){
+	sb.dealloc();
+}
+
+struct FormatInfo {
+	i32 precision_post = 0;
+	i32 precision_pre = 0;
+	rune padding = 0;
+	i8 base = 0;
+};
+
+template<typename T>
+void format(StringBuilder* sb, FormatInfo info, T value) = delete;
+
+template<>
+void format<i64>(StringBuilder* sb, FormatInfo info, i64 value){
+	if(value < 0){
+		sb->push_rune('-');
+	}
+	
+	isize begin = sb->data.size();
+	
+	switch(info.base){
+		case 2: {
+			i64 n = abs(value);
+			while(n > 0){
+				auto set = bool(n & 1);
+				n = n >> 1;
+				sb->push_rune(set ? '1' : '0');
+			}
+			isize end = sb->data.size();
+			
+			auto digits = sb->data.sub(begin, end);
+			reverse(digits);
+		} break;
+		
+		case 8: {} break;
+		case 10: {} break;
+		case 16: {} break;
+	}
+	
+}
+
+
+void writeln(string msg){
+	std::printf("%.*s\n", (int)(msg.size()), msg.raw_data());
+}
+
+#define MEBIBYTE (1024ll * 1024ll * 1024ll)
+
 int main(void) {
-    string s = "Olá 世界";
-    for(auto [r, n] : s){
-		auto [encoded, _] = utf8::encode(r);
-		printf("U+%06x %.*s\t%d\n", r, n, encoded.data, n);
-    }
+	static auto arena_buf = Array<byte, 4 * MEBIBYTE>{0};
+	auto arena = Arena::from(arena_buf.sub());
+	auto allocator = arena.allocator();
+
+	auto sb = StringBuilder::create(allocator);
+	// defer(destroy(sb));
+
+	auto info = FormatInfo{0};
+	info.base = 2;
+	format(&sb, info, isize(2));
+	string s = sb.build();
+	writeln(s);
+
     return 0;
 }
