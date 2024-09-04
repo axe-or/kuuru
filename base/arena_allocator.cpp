@@ -1,3 +1,5 @@
+#include "base.hpp"
+
 void* Arena::alloc(isize nbytes, Align align) {
     if(nbytes == 0){ return nullptr; }
 
@@ -15,19 +17,14 @@ void* Arena::alloc(isize nbytes, Align align) {
     return (void*)(aligned_base);
 }
 
-void Allocator::free_all(void) {
-    offset = 0;
-}
-
-static Arena Arena::from(Slice<byte> buf){
+Arena Arena::from(Slice<byte> buf){
     Arena a;
     a.data = buf.raw_data();
     a.capacity = buf.size();
     return a;
 }
 
-
-static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
+static void* allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
     using O = Allocator::Operation;
 
     auto self = (Arena*)(impl);
@@ -54,5 +51,5 @@ static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Al
 }
 
 Allocator Arena::allocator(){
-    return Allocator::from((void*)(this), _allocator_func);
+    return Allocator::from((void*)(this), allocator_func);
 }

@@ -12,33 +12,19 @@ isize cstring_len(cstring cstr){
 
 
 
-namespace cpp {
-struct UTF8IteratorWrapper : public utf8::Iterator {
-	void operator++(){}
-
-	auto operator*(){
-		return next();
-	}
-
-	bool operator!=(UTF8IteratorWrapper rhs){
-		return current != rhs.current;
-	}
-};
-} /* namespace cpp */
-
 // --- String ---
-static string string::from_bytes(Slice<byte> bytes){
+string string::from_bytes(Slice<byte> bytes){
 	string s;
 	s.data = bytes.raw_data();
 	s.length = bytes.size();
 	return s;
 }
 
-static string string::from_cstring(cstring cstr){
+string string::from_cstring(cstring cstr){
 	return from_cstring(cstr, cstring_len(cstr));
 }
 
-static string string::from_cstring(cstring cstr, isize length){
+string string::from_cstring(cstring cstr, isize length){
 	string s;
 	s.data = (byte*)(cstr);
 	s.length = length;
@@ -125,14 +111,10 @@ void StringBuilder::push_integer(i64 value, i8 base){
 	reverse(digits);
 }
 
-static auto StringBuilder::create(Allocator allocator){
+auto StringBuilder::create(Allocator allocator){
 	StringBuilder sb;
 	sb.data = DynamicArray<byte>::create(allocator);
 	return sb;
-}
-
-void StringBuilder::clear(){
-	data.clear();
 }
 
 string StringBuilder::build(){

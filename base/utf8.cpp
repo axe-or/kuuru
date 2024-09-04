@@ -1,4 +1,5 @@
 #include "base.hpp"
+
 namespace utf8 {
 
 constexpr Array<rune, 2> surrogate_range = {0xd800, 0xdfff};

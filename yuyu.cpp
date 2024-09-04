@@ -1,4 +1,6 @@
 #include "base/base.hpp"
+#include <cstdio>
+
 
 struct Lexer {
 	string source = "";

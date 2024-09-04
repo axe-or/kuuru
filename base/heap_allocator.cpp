@@ -1,3 +1,5 @@
+#include "base.hpp"
+
 static void* heap_alloc(isize nbytes, Align align) {
     if(nbytes == 0){ return nullptr; }
     byte* p = new(std::align_val_t(align)) byte[nbytes];
@@ -20,11 +22,11 @@ static void* allocator_func(Allocator::Operation op, void* impl, isize size, Ali
 
     switch(op){
         case O::Alloc:
-            return HeapAllocator::alloc(size, align);
+            return heap_alloc(size, align);
         break;
 
         case O::Free:
-            HeapAllocator::free(ptr, align);
+            heap_free(ptr, align);
         break;
 
         case O::Free_All: break;
@@ -39,12 +41,6 @@ static void* allocator_func(Allocator::Operation op, void* impl, isize size, Ali
 
 }
 
-static Allocator HeapAllocator::get(){
+Allocator HeapAllocator::get(){
     return Allocator::from(nullptr, allocator_func);
 }
-
-
-static void* alloc(isize nbytes, Align align) {
-static void free(void const* ptr, Align align) {
-
-static Allocator get(){

@@ -39,6 +39,11 @@ struct pair {
 };
 
 template<typename T> constexpr
+T abs(T x){
+	return (x < T(0)) ? -x : x;
+}
+
+template<typename T> constexpr
 T min(T a, T b){
 	return (a < b) ? a : b;
 }
@@ -203,6 +208,7 @@ void destroy(T* ptr, Allocator allocator){
 	allocator.free(ptr, alignof(T));
 }
 
+[[maybe_unused]]
 static void free_all(Allocator a){
 	a.free_all();
 }
@@ -566,7 +572,7 @@ struct Arena {
 	uintptr offset = 0;
 
     void* alloc(isize nbytes, Align align);
-    void Allocator::free_all(void);
+    void free_all(void);
     static Arena from(Slice<byte> buf);
     Allocator allocator();
 };
@@ -592,6 +598,19 @@ struct Iterator {
 };
 } /* namespace utf8 */
 
+namespace cpp {
+struct UTF8IteratorWrapper : public utf8::Iterator {
+	void operator++(){}
+
+	auto operator*(){
+		return next();
+	}
+
+	bool operator!=(UTF8IteratorWrapper rhs){
+		return current != rhs.current;
+	}
+};
+} /* namespace cpp */
 
 struct string {
 private:
@@ -603,9 +622,8 @@ public:
 	static string from_cstring(cstring cstr);
 	static string from_bytes(Slice<byte> bytes);
     
-    isize size() { return length; }
-
-	byte* raw_data() { return data; }
+    auto size() { return length; }
+	auto raw_data() { return data; }
     
 	utf8::Iterator iter();
 
@@ -631,19 +649,19 @@ public:
 struct StringBuilder {
 	DynamicArray<byte> data;
 
+    static auto create(Allocator allocator);
 
-	auto allocator() const {
-		return data.allocator;
-	}
-	
-	void dealloc(){
-		data.dealloc();
-	}
+	auto allocator() const { return data.allocator; }
+	auto clear(){ data.clear(); }  
+	auto dealloc(){	data.dealloc();	}
 
-void StringBuilder::push_rune(rune r);
-void StringBuilder::push_string(string s);
+    void push_rune(rune r);
+    void push_string(string s);
+    void push_integer(i64 value, i8 base);
+    string build();
 };
 
+[[maybe_unused]]
 static void destroy(StringBuilder sb){
 	sb.dealloc();
 }
@@ -654,12 +672,10 @@ bool operator==(string a, string b){
     auto buf_a = a.raw_data();
     auto buf_b = b.raw_data();
 
-	for(isize i = 0; i < a.length; i += 1){
+	for(isize i = 0; i < a.size(); i += 1){
 		if(buf_a[i] != buf_b[i]){ return false; }
 	}
 	return true;
 }
-
-
 
 #pragma endregion

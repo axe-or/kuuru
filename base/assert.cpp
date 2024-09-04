@@ -1,3 +1,5 @@
+#include "base.hpp"
+
 #include <iostream> /* DEBUG ONLY. DON'T USE iostream, IT SUCKS. */
 
 void assert(bool cond, cstring msg){
@@ -8,7 +10,7 @@ void assert(bool cond, cstring msg){
 }
 
 [[noreturn]]
-void unimplemented(cstring msg = ""){
+void unimplemented(cstring msg){
 	std::fprintf(stderr, "Unimplemented code: %s\n", msg);
 	throw "UNIMPLEMENTED";
 }
