@@ -667,7 +667,7 @@ static void destroy(StringBuilder sb){
 	sb.dealloc();
 }
 
-bool operator==(string a, string b){
+static inline bool operator==(string a, string b){
 	if(a.size() != b.size()){ return false; }
     
     auto buf_a = a.raw_data();
