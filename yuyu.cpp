@@ -1,10 +1,4 @@
-#include "prelude.hpp"
-
-#include <stdio.h>
-
-
-#include "allocators.cpp"
-#include "string.cpp"
+#include "base/base.hpp"
 
 struct Lexer {
 	string source = "";

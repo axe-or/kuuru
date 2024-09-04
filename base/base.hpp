@@ -1,8 +1,215 @@
-#pragma once
+// This contains all declarations for the `base` library set.
 
-#include "assert.cpp"
-#include "allocators.cpp"
+#pragma region Prelude
+#include <stddef.h>
+#include <stdint.h>
+#include <stdatomic.h>
+#include <new>
 
+using i8  = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
+
+using u8  = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+
+using f32 = float;
+using f64 = double;
+
+using isize = ptrdiff_t;
+using usize = size_t;
+
+using byte = uint8_t;
+using rune = int32_t;
+
+using uintptr = uintptr_t;
+
+using cstring = char const *;
+
+static_assert(sizeof(isize) == sizeof(usize), "Mismatched size types");
+static_assert(sizeof(f32) == 4 && sizeof(f64) == 8, "Bad floating point size types");
+
+template<typename A, typename B = A>
+struct pair {
+	A a;
+	B b;
+};
+
+template<typename T> constexpr
+T min(T a, T b){
+	return (a < b) ? a : b;
+}
+
+template<typename T> constexpr
+T max(T a, T b){
+	return (a > b) ? a : b;
+}
+
+template<typename T, typename... Args> constexpr
+T min(T a, T b, Args&& ...rest){
+	if(a < b){
+		return min(a, rest...);
+	}
+	else {
+		return min(b, rest...);
+	}
+}
+
+template<typename T, typename... Args> constexpr
+T max(T a, T b, Args&& ...rest){
+	if(a > b){
+		return max(a, rest...);
+	}
+	else {
+		return max(b, rest...);
+	}
+}
+
+template<typename T> constexpr
+T clamp(T lo, T x, T hi){
+	return min(max(lo, x), hi);
+}
+
+template<typename T> constexpr
+void swap(T* a, T* b){
+	T tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+namespace _defer_impl {
+	template<typename F>
+	struct Deferred {
+		F f;
+		Deferred(F&& f) : f(f) {}
+		~Deferred(){ f(); }
+	};
+
+	#define CONCAT_0(X, Y) X##Y
+
+	#define CONCAT_1(X, Y) CONCAT_0(X, Y)
+
+	#define CONCAT_COUNTER(X) CONCAT_1(X, __COUNTER__)
+
+	#define defer(EXPR) auto CONCAT_COUNTER(_defer_stmt) = \
+		::_defer_impl::Deferred([&](){ do { EXPR ; } while(0); });
+}
+
+#define prohibit_copy(T) \
+	T(T const&) = delete; \
+	void operator=(T const&) = delete;
+
+#define prohibit_move(T) \
+	T(T &&) = delete; \
+	void operator=(T &&) = delete;
+
+#pragma endregion
+
+#pragma region Assert
+void assert(bool cond, cstring msg);
+
+[[noreturn]]
+void unimplemented(cstring msg = "");
+
+[[noreturn]]
+void panic(cstring msg);
+
+#pragma endregion
+
+#pragma region Memory
+using Align = decltype(alignof(int));
+
+void mem_copy(void* dest, void const* src, isize nbytes);
+
+void mem_copy_no_overlap(void* dest, void const* src, isize nbytes);
+
+void mem_set(void* dest, byte val, isize nbytes);
+
+void mem_zero(void* dest, isize nbytes);
+
+bool valid_alignment(Align align);
+
+uintptr align_forward(uintptr n, Align align);
+
+// Allocator interface
+struct Allocator {
+	enum class Operation : i32 {
+		Query = 0,
+		Alloc,
+		Free,
+		Free_All,
+	};
+
+	using Func = void* (*)(
+		Operation op,
+		void* impl,
+		isize size,
+		Align align,
+		void const* ptr,
+		i32* query_res);
+
+	enum class Capability : i32 {
+		Alloc_Any = 1 << 0, // Supports arbitrary allocation size
+		Free_Any  = 1 << 1, // Supports individual/out-of-order free
+		Free_All  = 1 << 2, // Supports free all
+		Align_Any = 1 << 3, // Supports arbitrary alignment
+	};
+
+	Allocator::Func fn_ = nullptr;
+	void* impl_ = nullptr;
+
+	void* alloc(isize nbytes, Align align){
+		return fn_(Operation::Alloc, impl_, nbytes, align, nullptr, nullptr);
+	}
+
+	void free(void const* ptr, Align align){
+		fn_(Operation::Free, impl_, 0, align, ptr, nullptr);
+	}
+
+	void free_all(void){
+		fn_(Operation::Free_All, impl_, 0, 0, nullptr, nullptr);
+	}
+
+	i32 capabilities(void){
+		i32 cap = 0;
+		fn_(Operation::Query, impl_, 0, 0, nullptr, &cap);
+		return cap;
+	}
+
+	static Allocator from(void* impl, Allocator::Func fn){
+		Allocator a;
+		a.fn_ = fn;
+		a.impl_ = impl;
+		return a;
+	}
+};
+
+template<typename T> [[nodiscard]]
+T* make(Allocator allocator){
+	T* ptr = (T*)(allocator.alloc(sizeof(T), alignof(T)));
+	if(ptr != nullptr){
+		mem_zero(ptr, sizeof(T));
+	}
+	return ptr;
+}
+
+template<typename T>
+void destroy(T* ptr, Allocator allocator){
+	if(ptr == nullptr){ return; }
+	ptr->~T();
+	allocator.free(ptr, alignof(T));
+}
+
+static void free_all(Allocator a){
+	a.free_all();
+}
+
+#pragma endregion
+
+#pragma region Containers
 template<typename T>
 struct Slice {
 private:
@@ -31,7 +238,7 @@ public:
 		assert(start <= end && start >= 0 && end >= 0, "Invalid range for slice");
 		return Slice<T>::from(&data[start], end - start);
 	}
-	
+
 	Slice<T> sub(){
 		return *this;
 	}
@@ -346,3 +553,113 @@ template<typename T>
 void destroy(DynamicArray<T> arr){
 	arr.dealloc();
 }
+#pragma endregion
+
+#pragma region Allocators
+struct HeapAllocator {
+    static Allocator get();
+};
+
+struct Arena {
+	byte* data = nullptr;
+	uintptr capacity = 0;
+	uintptr offset = 0;
+
+    void* alloc(isize nbytes, Align align);
+    void Allocator::free_all(void);
+    static Arena from(Slice<byte> buf);
+    Allocator allocator();
+};
+
+#pragma endregion
+
+#pragma region String 
+isize cstring_len(cstring cstr);
+
+namespace utf8 {
+
+constexpr rune error_rune = 0xfffd;
+
+pair<Array<byte, 4>, i32> encode(rune r);
+pair<rune, i32> decode(Slice<byte> s);
+
+struct Iterator {
+	Slice<byte> data;
+	isize current = 0;
+
+    pair<rune, i32> next();
+    bool done() const;
+};
+} /* namespace utf8 */
+
+
+struct string {
+private:
+	byte* data = nullptr;
+	isize length = 0;
+
+public:
+	static string from_cstring(cstring cstr, isize length);
+	static string from_cstring(cstring cstr);
+	static string from_bytes(Slice<byte> bytes);
+    
+    isize size() { return length; }
+
+	byte* raw_data() { return data; }
+    
+	utf8::Iterator iter();
+
+    // Implicit constructor
+	string(cstring cs){
+        *this = from_cstring(cs);
+	}
+	string(){}
+
+    auto begin() const {
+        cpp::UTF8IteratorWrapper it;
+        it.data = Slice<byte>::from((byte*)(data), length);
+        return it;
+    }   
+
+    auto end() const {
+        cpp::UTF8IteratorWrapper it;
+        it.current = length;
+        return it;
+    }
+};
+
+struct StringBuilder {
+	DynamicArray<byte> data;
+
+
+	auto allocator() const {
+		return data.allocator;
+	}
+	
+	void dealloc(){
+		data.dealloc();
+	}
+
+void StringBuilder::push_rune(rune r);
+void StringBuilder::push_string(string s);
+};
+
+static void destroy(StringBuilder sb){
+	sb.dealloc();
+}
+
+bool operator==(string a, string b){
+	if(a.size() != b.size()){ return false; }
+    
+    auto buf_a = a.raw_data();
+    auto buf_b = b.raw_data();
+
+	for(isize i = 0; i < a.length; i += 1){
+		if(buf_a[i] != buf_b[i]){ return false; }
+	}
+	return true;
+}
+
+
+
+#pragma endregion
