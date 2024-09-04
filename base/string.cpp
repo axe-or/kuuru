@@ -111,7 +111,7 @@ void StringBuilder::push_integer(i64 value, i8 base){
 	reverse(digits);
 }
 
-auto StringBuilder::create(Allocator allocator){
+StringBuilder StringBuilder::create(Allocator allocator){
 	StringBuilder sb;
 	sb.data = DynamicArray<byte>::create(allocator);
 	return sb;

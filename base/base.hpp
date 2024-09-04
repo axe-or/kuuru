@@ -1,4 +1,5 @@
 // This contains all declarations for the `base` library set.
+#pragma once
 
 #pragma region Prelude
 #include <stddef.h>
@@ -649,7 +650,7 @@ public:
 struct StringBuilder {
 	DynamicArray<byte> data;
 
-    static auto create(Allocator allocator);
+    static StringBuilder create(Allocator allocator);
 
 	auto allocator() const { return data.allocator; }
 	auto clear(){ data.clear(); }  
@@ -679,3 +680,5 @@ bool operator==(string a, string b){
 }
 
 #pragma endregion
+
+

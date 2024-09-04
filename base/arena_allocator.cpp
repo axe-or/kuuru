@@ -17,6 +17,10 @@ void* Arena::alloc(isize nbytes, Align align) {
     return (void*)(aligned_base);
 }
 
+void Arena::free_all(){
+    offset = 0;
+}
+
 Arena Arena::from(Slice<byte> buf){
     Arena a;
     a.data = buf.raw_data();
@@ -24,7 +28,7 @@ Arena Arena::from(Slice<byte> buf){
     return a;
 }
 
-static void* allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
+static void* arena_allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
     using O = Allocator::Operation;
 
     auto self = (Arena*)(impl);
@@ -51,5 +55,5 @@ static void* allocator_func(Allocator::Operation op, void* impl, isize size, Ali
 }
 
 Allocator Arena::allocator(){
-    return Allocator::from((void*)(this), allocator_func);
+    return Allocator::from((void*)(this), arena_allocator_func);
 }

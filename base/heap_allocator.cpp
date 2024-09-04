@@ -15,7 +15,7 @@ static void heap_free(void const* ptr, Align align) {
     operator delete[]((void*)(ptr), std::align_val_t(align));
 }
 
-static void* allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
+static void* heap_allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
     using O = Allocator::Operation;
 
     (void)impl;
@@ -42,5 +42,5 @@ static void* allocator_func(Allocator::Operation op, void* impl, isize size, Ali
 }
 
 Allocator HeapAllocator::get(){
-    return Allocator::from(nullptr, allocator_func);
+    return Allocator::from(nullptr, heap_allocator_func);
 }
