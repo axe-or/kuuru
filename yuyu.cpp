@@ -1,17 +1,9 @@
-// cflags = -O0 -fPIC -pipe -Wall -Wextra
+#include "prelude.hpp"
+
 #include <stdio.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdatomic.h>
-#include <new>
 
 
-#pragma region Memory
-#pragma endregion
-
-#pragma region Allocator
-#pragma endregion
-
+#include "allocators.cpp"
 #include "string.cpp"
 
 struct Lexer {

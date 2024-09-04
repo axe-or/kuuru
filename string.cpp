@@ -1,6 +1,7 @@
 #pragma once
 
 #include "prelude.hpp"
+#include "container.cpp"
 
 isize cstring_len(cstring cstr){
 	constexpr isize MAX_CSTR_LEN = isize(~u32(0) >> u32(1));

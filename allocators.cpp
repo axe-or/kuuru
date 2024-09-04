@@ -1,3 +1,9 @@
+#pragma once
+
+#include "prelude.hpp"
+#include "container.cpp"
+#include "memory.cpp"
+
 struct HeapAllocator {
 	static void* alloc(isize nbytes, Align align) {
 		if(nbytes == 0){ return nullptr; }
