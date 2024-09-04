@@ -113,21 +113,7 @@ namespace _defer_impl {
 // Most of the things here are so we can access certain language features that unfortunately require
 // some adherence to cognitive decline. E.g.: foreach loops require stupid iterator stuff.
 // Do NOT rely on anything that has cpp:: on it.
-namespace cpp {
-
-	struct Error {
-			cstring msg = "";
-		cstring what() const {
-			return msg;
-		}
-	};
-
-	void raise_error(cstring msg){
-		Error e;
-		e.msg = msg;
-		throw e;
-	}
-}
+namespace cpp {}
 #pragma endregion
 
 #pragma region Debug
@@ -492,8 +478,6 @@ struct DynamicArray {
 
 	void resize(isize new_cap){
 		T* new_data = (T*)(allocator.alloc(sizeof(T) * new_cap, alignof(T)));
-		print("Resizing to:", sizeof(T) * new_cap);
-		
 		assert(new_data != nullptr, "Failed allocation");
 
 		if(data != nullptr){
@@ -1189,9 +1173,9 @@ void format<i64>(StringBuilder* sb, FormatInfo info, i64 value){
 		case 2: {
 			i64 n = abs(value);
 			while(n > 0){
-				auto set = bool(n & 1);
+				auto val = bool(n & 1);
 				n = n >> 1;
-				sb->push_rune(set ? '1' : '0');
+				sb->push_rune(i32('0') + val);
 			}
 			isize end = sb->data.size();
 			
@@ -1199,13 +1183,66 @@ void format<i64>(StringBuilder* sb, FormatInfo info, i64 value){
 			reverse(digits);
 		} break;
 		
-		case 8: {} break;
-		case 10: {} break;
-		case 16: {} break;
+		case 8: {
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n & 7;
+				n = n >> 3;
+				sb->push_rune(i32('0') + val);
+			}
+			isize end = sb->data.size();
+			
+			auto digits = sb->data.sub(begin, end);
+			reverse(digits);
+		} break;
+		
+		case 10: {
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n % 10;
+				n = n / 10;
+				sb->push_rune(i32('0') + val);
+			}
+			isize end = sb->data.size();
+			
+			auto digits = sb->data.sub(begin, end);
+			reverse(digits);
+		} break;
+		
+		case 16: { // TODO: Handle uppercase
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n & 15;
+				n = n >> 4;
+				sb->push_rune(i32('0') + val);
+			}
+			isize end = sb->data.size();
+			
+			auto digits = sb->data.sub(begin, end);
+			reverse(digits);
+		} break;
+		
+		default: {
+			sb->push_string("%!(UNKNOWN BASE)");
+		} break;
 	}
 	
 }
 
+template<>
+void format<i32>(StringBuilder* sb, FormatInfo info, i32 value){
+	return format(sb, info, i64(value));
+}
+
+template<>
+void format<i16>(StringBuilder* sb, FormatInfo info, i16 value){
+	return format(sb, info, i64(value));
+}
+
+template<>
+void format<i8>(StringBuilder* sb, FormatInfo info, i8 value){
+	return format(sb, info, i64(value));
+}
 
 void writeln(string msg){
 	std::printf("%.*s\n", (int)(msg.size()), msg.raw_data());
@@ -1214,18 +1251,43 @@ void writeln(string msg){
 #define MEBIBYTE (1024ll * 1024ll * 1024ll)
 
 int main(void) {
-	static auto arena_buf = Array<byte, 4 * MEBIBYTE>{0};
+	static auto arena_buf = Array<byte, 1 * MEBIBYTE>{0};
 	auto arena = Arena::from(arena_buf.sub());
 	auto allocator = arena.allocator();
+	defer(free_all(allocator));
 
 	auto sb = StringBuilder::create(allocator);
 	// defer(destroy(sb));
 
-	auto info = FormatInfo{0};
-	info.base = 2;
-	format(&sb, info, isize(2));
-	string s = sb.build();
-	writeln(s);
+	{
+		auto info = FormatInfo{0};
+		info.base = 2;
+		format(&sb, info, (-153));
+		string s = sb.build();
+		writeln(s);		
+	}
 
+	{
+		auto info = FormatInfo{0};
+		info.base = 8;
+		format(&sb, info, (-153));
+		string s = sb.build();
+		writeln(s);		
+	}
+
+	{
+		auto info = FormatInfo{0};
+		info.base = 16;
+		format(&sb, info, (-153));
+		string s = sb.build();
+		writeln(s);		
+	}
+	{
+		auto info = FormatInfo{0};
+		info.base = 10;
+		format(&sb, info, (-153));
+		string s = sb.build();
+		writeln(s);		
+	}
     return 0;
 }
