@@ -225,8 +225,8 @@ struct Allocator {
 		return fn_(Operation::Alloc, impl_, nbytes, align, nullptr, nullptr);
 	}
 
-	void free(void const* ptr){
-		fn_(Operation::Free, impl_, 0, 0, ptr, nullptr);
+	void free(void const* ptr, Align align){
+		fn_(Operation::Free, impl_, 0, align, ptr, nullptr);
 	}
 
 	void free_all(void){
@@ -260,7 +260,7 @@ template<typename T>
 void destroy(T* ptr, Allocator allocator){
 	if(ptr == nullptr){ return; }
 	ptr->~T();
-	allocator.free(ptr);
+	allocator.free(ptr, alignof(T));
 }
 
 void free_all(Allocator a){
@@ -296,6 +296,10 @@ public:
 	Slice<T> sub(isize start, isize end){
 		assert(start <= end && start >= 0 && end >= 0, "Invalid range for slice");
 		return Slice<T>::from(&data[start], end - start);
+	}
+	
+	Slice<T> sub(){
+		return *this;
 	}
 
 	void reset() {
@@ -334,7 +338,7 @@ void destroy(Slice<T> s, Allocator allocator){
 	for(isize i = 0; i < s.size(); i += 1){
 		s[i].~T();
 	}
-	allocator.free(s.raw_data());
+	allocator.free(s.raw_data(), alignof(T));
 }
 
 template<typename T>
@@ -487,7 +491,7 @@ struct DynamicArray {
 		if(new_cap > length){
 			mem_zero(&new_data[length], (new_cap - length) * sizeof(T));
 		}
-		allocator.free(data);
+		allocator.free(data, alignof(T));
 
 		length = min(new_cap, length);
 		capacity = new_cap;
@@ -598,7 +602,7 @@ struct DynamicArray {
 
 	void dealloc(){
 		clear();
-		allocator.free(data);
+		allocator.free(data, alignof(T));
 		data = nullptr;
 		capacity = 0;
 	}
@@ -611,7 +615,7 @@ void destroy(DynamicArray<T> arr){
 
 #pragma endregion
 
-#pragma region Allocators
+#pragma region Allocator
 struct HeapAllocator {
 	static void* alloc(isize nbytes, Align align) {
 		if(nbytes == 0){ return nullptr; }
@@ -622,9 +626,10 @@ struct HeapAllocator {
 		return (void*)(p);
 	}
 
-	static void free(void const* ptr) {
+	static void free(void const* ptr, Align align) {
 		if(ptr == nullptr) { return; }
-		delete[] (byte const*)(ptr);
+
+		operator delete[]((void*)(ptr), std::align_val_t(align));
 	}
 
 	static void* _allocator_func(Allocator::Operation op, void* impl, isize size, Align align, void const* ptr, i32* query_res){
@@ -638,7 +643,7 @@ struct HeapAllocator {
 			break;
 
 			case O::Free:
-				HeapAllocator::free(ptr);
+				HeapAllocator::free(ptr, align);
 			break;
 
 			case O::Free_All: break;
@@ -946,151 +951,137 @@ public:
 		return it;
 	}
 };
-#pragma endregion
 
-#pragma region Tests
-struct Test {
-	cstring title = "";
-	i32 failed = 0;
-	i32 total = 0;
+struct StringBuilder {
+	DynamicArray<byte> data;
 
-	void report(){
-		cstring msg = (failed == 0) ? "PASS" : "FAIL";
-		std::printf("[%s] %s ok in %d/%d\n", title, msg, total - failed, total);
+	void push_rune(rune r){
+		auto [bytes, n] = utf8::encode(r);
+		data.append_slice(bytes.sub(0, n));
 	}
 
-	bool expect(bool pred){
-		if(!pred){
-			std::printf("Failed expect\n");
-			failed += 1;
-		}
-		total += 1;
-		return pred;
+	void push_string(string s){
+		data.append_slice(Slice<byte>::from(s.raw_data(), s.size()));
 	}
 
-	static Test create(cstring title){
-		Test t;
-		t.title = title;
-		return t;
+	static auto create(Allocator allocator){
+		StringBuilder sb;
+		sb.data = DynamicArray<byte>::create(allocator);
+		return sb;
+	}
+	
+	void clear(){
+		data.clear();
 	}
 
-	~Test(){
-		report();
+	string build(){
+		data.resize(data.size());
+		auto s = data.extract_slice();
+		return string::from_bytes(s);
+	}
+
+	auto allocator() const {
+		return data.allocator;
+	}
+	
+	void dealloc(){
+		data.dealloc();
 	}
 };
 
-void test_arena(){
-	auto t = Test::create("Arena Allocator");
-	auto heap_alloc = HeapAllocator::get();
-	auto buf = make_slice<byte>(128, heap_alloc);
-	defer(destroy(buf, heap_alloc));
-	auto arena = Arena::from(buf);
-	auto allocator = arena.allocator();
-	{
-		auto old_offset = arena.offset;
-		(void) make<i32>(allocator);
-		t.expect(old_offset + 4 == arena.offset);
+void destroy(StringBuilder sb){
+	sb.dealloc();
+}
+#pragma endregion
+
+#pragma region Format
+struct FormatInfo {
+	i32 precision_post = 0;
+	i32 precision_pre = 0;
+	rune padding = 0;
+	i8 base = 0;
+};
+
+template<typename T>
+void format(StringBuilder* sb, FormatInfo info, T value) = delete;
+
+template<>
+void format<i64>(StringBuilder* sb, FormatInfo info, i64 value){
+	if(value < 0){
+		sb->push_rune('-');
 	}
-	{
-		auto old_offset = arena.offset;
-		(void) make<i8>(allocator);
-		t.expect(old_offset + 1 == arena.offset);
+	
+	isize begin = sb->data.size();
+	isize end = 0;
+	
+	switch(info.base){
+		case 2: {
+			i64 n = abs(value);
+			while(n > 0){
+				auto val = bool(n & 1);
+				n = n >> 1;
+				sb->push_rune(i32('0') + val);
+			}
+			end = sb->data.size();
+		} break;
+		
+		case 8: {
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n & 7;
+				n = n >> 3;
+				sb->push_rune(i32('0') + val);
+			}
+			end = sb->data.size();
+		} break;
+		
+		case 10: {
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n % 10;
+				n = n / 10;
+				sb->push_rune(i32('0') + val);
+			}
+			end = sb->data.size();
+		} break;
+		
+		case 16: { // TODO: Handle uppercase
+			i64 n = abs(value);
+			while(n > 0){
+				i32 val = n & 15;
+				n = n >> 4;
+				if(val < 10){
+					sb->push_rune(i32('0') + val);
+				}
+				else {
+					sb->push_rune(i32('a') + val - 10);
+				}
+			}
+			end = sb->data.size();
+		} break;
+		
+		default: {
+			sb->push_string("%!(UNKNOWN BASE)");
+		} break;
 	}
-	{
-		auto old_offset = arena.offset;
-		(void) make<i32>(allocator);
-		t.expect(old_offset + 3 + 4 == arena.offset);
-	}
-	{
-		auto old_offset = arena.offset;
-		(void) make<i64>(allocator);
-		t.expect(old_offset + 4 + 8 == arena.offset);
-	}
-	{
-		auto p = make_slice<byte>(128, allocator);
-		t.expect(p.empty());
-	}
-	free_all(allocator);
-	{
-		auto p = make_slice<byte>(128, allocator);
-		t.expect(!p.empty());
-		p[127] = '1';
-	}
-	{
-		auto p = make<i8>(allocator);
-		t.expect(p == nullptr);
-	}
+	
+	auto digits = sb->data.sub(begin, end);
+	reverse(digits);
 }
 
-void test_dynamic_array(){
-	// TODO, use .expect once we have string formatting
-	auto t = Test::create("Dynamic Array");
-	auto arr = DynamicArray<i32>::create(HeapAllocator::get());
-	defer(destroy(arr));
-
-	constexpr auto print_arr = [](DynamicArray<i32> a){
-		print("cap:", a.cap(), "len:", a.size());
-		for(isize i = 0; i < a.size(); i += 1){
-			std::cout << a[i] << ' ';
-		}
-		print("");
-	};
-
-	print_arr(arr);
-	arr.append(6);
-	arr.append(9);
-	print_arr(arr);
-	arr.insert(0, 4);
-	arr.insert(1, 2);
-
-	arr.insert(2, 0);
-
-	print_arr(arr);
-	arr.remove(arr.size() - 1);
-	arr.remove(3);
-	print_arr(arr);
-	arr.remove(0);
-	print_arr(arr);
-	arr.remove(0);
-	arr.remove(0);
-	print_arr(arr);
-	arr.insert(0, 69);
-	arr.insert(0, 420);
-	print_arr(arr);
+template<>
+void format<i32>(StringBuilder* sb, FormatInfo info, i32 value){
+	return format(sb, info, i64(value));
 }
 
-void test_utf8(){
-	auto t = Test::create("UTF-8");
-	const rune codepoints[] = {
-		0x0024,  /* $ */
-		0x0418,  /* И */
-		0xd55c,  /* 한 */
-		0x10348, /* 𐍈 */
-	};
-	const cstring encoded[] = {"$", "И", "한", "𐍈"};
+template<>
+void format<i16>(StringBuilder* sb, FormatInfo info, i16 value){
+	return format(sb, info, i64(value));
+}
 
-	isize const N = (sizeof(codepoints) / sizeof(rune));
-
-	for(isize i = 0; i < N; i += 1){
-		auto [bytes, len] = utf8::encode(codepoints[i]);
-		t.expect(len == i + 1);
-
-		auto a = string::from_bytes(bytes.sub(0, len));
-		auto b = string::from_cstring(encoded[i]);
-
-		t.expect(a == b);
-	}
-
-	for(isize i = 0; i < N; i += 1){
-		auto s = Slice<byte>::from((byte *)encoded[i], cstring_len(encoded[i]));
-		auto [codepoint, len] = utf8::decode(s);
-		t.expect(len == i + 1);
-
-		rune a = codepoints[i];
-		rune b = codepoint;
-		t.expect(a == b);
-	}
-
+template<>
+void format<i8>(StringBuilder* sb, FormatInfo info, i8 value){
+	return format(sb, info, i64(value));
 }
 #pragma endregion
 
@@ -1114,159 +1105,28 @@ struct Lexer {
 	}
 };
 
-struct StringBuilder {
-	DynamicArray<byte> data;
-
-	void push_rune(rune r){
-		auto [bytes, n] = utf8::encode(r);
-		data.append_slice(bytes.sub(0, n));
-	}
-
-	void push_string(string s){
-		data.append_slice(Slice<byte>::from(s.raw_data(), s.size()));
-	}
-
-	static auto create(Allocator allocator){
-		StringBuilder sb;
-		sb.data = DynamicArray<byte>::create(allocator);
-		return sb;
-	}
-
-	string build(){
-		data.resize(data.size());
-		auto s = data.extract_slice();
-		return string::from_bytes(s);
-	}
-
-	auto allocator() const {
-		return data.allocator;
-	}
-	
-	void dealloc(){
-		data.dealloc();
-	}
-};
-
-void destroy(StringBuilder sb){
-	sb.dealloc();
-}
-
-struct FormatInfo {
-	i32 precision_post = 0;
-	i32 precision_pre = 0;
-	rune padding = 0;
-	i8 base = 0;
-};
-
-template<typename T>
-void format(StringBuilder* sb, FormatInfo info, T value) = delete;
-
-template<>
-void format<i64>(StringBuilder* sb, FormatInfo info, i64 value){
-	if(value < 0){
-		sb->push_rune('-');
-	}
-	
-	isize begin = sb->data.size();
-	
-	switch(info.base){
-		case 2: {
-			i64 n = abs(value);
-			while(n > 0){
-				auto val = bool(n & 1);
-				n = n >> 1;
-				sb->push_rune(i32('0') + val);
-			}
-			isize end = sb->data.size();
-			
-			auto digits = sb->data.sub(begin, end);
-			reverse(digits);
-		} break;
-		
-		case 8: {
-			i64 n = abs(value);
-			while(n > 0){
-				i32 val = n & 7;
-				n = n >> 3;
-				sb->push_rune(i32('0') + val);
-			}
-			isize end = sb->data.size();
-			
-			auto digits = sb->data.sub(begin, end);
-			reverse(digits);
-		} break;
-		
-		case 10: {
-			i64 n = abs(value);
-			while(n > 0){
-				i32 val = n % 10;
-				n = n / 10;
-				sb->push_rune(i32('0') + val);
-			}
-			isize end = sb->data.size();
-			
-			auto digits = sb->data.sub(begin, end);
-			reverse(digits);
-		} break;
-		
-		case 16: { // TODO: Handle uppercase
-			i64 n = abs(value);
-			while(n > 0){
-				i32 val = n & 15;
-				n = n >> 4;
-				sb->push_rune(i32('0') + val);
-			}
-			isize end = sb->data.size();
-			
-			auto digits = sb->data.sub(begin, end);
-			reverse(digits);
-		} break;
-		
-		default: {
-			sb->push_string("%!(UNKNOWN BASE)");
-		} break;
-	}
-	
-}
-
-template<>
-void format<i32>(StringBuilder* sb, FormatInfo info, i32 value){
-	return format(sb, info, i64(value));
-}
-
-template<>
-void format<i16>(StringBuilder* sb, FormatInfo info, i16 value){
-	return format(sb, info, i64(value));
-}
-
-template<>
-void format<i8>(StringBuilder* sb, FormatInfo info, i8 value){
-	return format(sb, info, i64(value));
-}
 
 void writeln(string msg){
 	std::printf("%.*s\n", (int)(msg.size()), msg.raw_data());
 }
 
-#define MEBIBYTE (1024ll * 1024ll * 1024ll)
+#define MEBIBYTE (1024ll * 1024ll)
 
 int main(void) {
-	static auto arena_buf = Array<byte, 1 * MEBIBYTE>{0};
-	auto arena = Arena::from(arena_buf.sub());
+	auto arena_buf = make_slice<byte>(8 * MEBIBYTE, HeapAllocator::get());
+    defer(destroy(arena_buf, HeapAllocator::get()));
+	auto arena = Arena::from(arena_buf);
 	auto allocator = arena.allocator();
 	defer(free_all(allocator));
 
 	auto sb = StringBuilder::create(allocator);
-	// defer(destroy(sb));
-
 	{
 		auto info = FormatInfo{0};
 		info.base = 2;
 		format(&sb, info, (-153));
 		string s = sb.build();
-		writeln(s);		
+		writeln(s);
 	}
-
 	{
 		auto info = FormatInfo{0};
 		info.base = 8;
@@ -1274,7 +1134,6 @@ int main(void) {
 		string s = sb.build();
 		writeln(s);		
 	}
-
 	{
 		auto info = FormatInfo{0};
 		info.base = 16;
