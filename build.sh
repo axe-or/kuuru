@@ -7,6 +7,7 @@ mode="$1"
 set -eu
 
 cc='clang++'
+iflags='-I.'
 cflags='-std=c++17 -fPIC -Wall -Wextra'
 ldflags=''
 ignoreflags='-Wno-unknown-pragmas'
@@ -17,6 +18,8 @@ case "$mode" in
 esac
 set -x
 
-$cc $cflags $ignoreflags -c base/lib.cpp -o base.o
-$cc $cflags $ignoreflags yuyu.cpp base.o -o yuyu $ldflags
+$cc $iflags $cflags $ignoreflags -c base/lib.cpp -o base.o
+$cc $iflags $cflags $ignoreflags -c yuyu.cpp -o yuyu.o
+$cc $iflags $cflags $ignoreflags main.cpp yuyu.o base.o -o yuyu $ldflags
+
 ./yuyu
