@@ -1,12 +1,20 @@
 #/usr/bin/env sh
+
+mode="$1"
+[ -z "$mode" ] \
+    && mode="debug"
+
 set -eu
 
-cc='g++'
-cflags='-std=c++17 -O0 -fPIC -Wall -Wextra'
+cc='clang++'
+cflags='-std=c++17 -fPIC -Wall -Wextra'
 ldflags=''
 ignoreflags='-Wno-unknown-pragmas'
 
-clear
+case "$mode" in 
+    "debug") cflags="$cflags -O0 -g -fsanitize=address" ;;
+    "release") cflags="$cflags -O2" ;;
+esac
 set -x
 
 $cc $cflags $ignoreflags -c base/lib.cpp -o base.o

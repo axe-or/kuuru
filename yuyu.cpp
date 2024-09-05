@@ -28,23 +28,31 @@ void writeln(string msg){
 
 #define MEBIBYTE (1024ll * 1024ll)
 
-int main(void) {
-	auto arena_buf = make_slice<byte>(8 * MEBIBYTE, HeapAllocator::get());
-    defer(destroy(arena_buf, HeapAllocator::get()));
-	auto arena = Arena::from(arena_buf);
-	auto allocator = arena.allocator();
-	defer(free_all(allocator));
+static pair<Allocator> init_allocators(){
+	static Allocator allocator{0};
+	static Allocator temp_allocator{0};
+	static Arena arena{0};
+	static Array<byte, 8 * MEBIBYTE> arena_buf{0};
 
-	auto sb = StringBuilder::create(allocator);
-    int n = 254;
-    sb.push_integer(n, 2);
-    sb.push_rune('\n');
-    sb.push_integer(n, 8);
-    sb.push_rune('\n');
-    sb.push_integer(n, 10);
-    sb.push_rune('\n');
-    sb.push_integer(n, 16);
-    sb.push_rune('\n');
-    writeln(sb.build());
+	static bool init = false;
+	if(!init){
+		mem_zero(arena_buf.sub().raw_data(), arena_buf.size());
+		arena = Arena::from(arena_buf.sub());
+		temp_allocator = arena.allocator();
+		allocator = HeapAllocator::get();
+		init = true;
+	}
+	return {allocator, temp_allocator};
+}
+
+int main(void) {
+	Allocator allocator, temp_allocator;
+	/* Init allocators */ {
+		auto allocators = init_allocators();
+		allocator = allocators.a;
+		temp_allocator = allocators.b;
+	}
+	defer(free_all(temp_allocator));
+	
     return 0;
 }
