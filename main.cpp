@@ -1,3 +1,4 @@
+#include "base/base.hpp"
 #include "yuyu.hpp"
 #include <cstdio>
 
@@ -24,6 +25,33 @@ static pair<Allocator> init_allocators(){
 	return {allocator, temp_allocator};
 }
 
+Slice<byte> read_whole_file(string path, Allocator allocator){
+	constexpr isize MAX_PATH_SIZE = 4096;
+	char namebuf[MAX_PATH_SIZE];
+
+	if(path.size() >= MAX_PATH_SIZE){
+		return {};
+	}
+
+	mem_copy_no_overlap(namebuf, path.raw_data(), path.size());
+	namebuf[path.size()] = 0;
+
+	FILE* f = std::fopen(&namebuf[0], "rb");
+	defer(if(f) std::fclose(f));
+
+	isize start = 0;
+	isize end = 0;
+
+	std::fseek(f, 0, SEEK_END);
+	end = std::ftell(f);
+	std::rewind(f);
+	start = std::ftell(f);
+
+	auto filedata = make_slice<byte>(end - start, allocator);
+	std::fread(filedata.raw_data(), 1, end - start, f);
+	return filedata;
+}
+
 int main(void) {
 	Allocator allocator, temp_allocator;
 	/* Init allocators */ {
@@ -32,6 +60,9 @@ int main(void) {
 		temp_allocator = allocators.b;
 	}
 	defer(free_all(temp_allocator));
+
+	auto src = read_whole_file("main.cpp", allocator);
+	writeln(string::from_bytes(src));
 	
     return 0;
 }

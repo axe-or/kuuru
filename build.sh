@@ -13,7 +13,7 @@ ldflags=''
 ignoreflags='-Wno-unknown-pragmas'
 
 case "$mode" in 
-    "debug") cflags="$cflags -O0 -g -fsanitize=address" ;;
+    "debug") cflags="$cflags -O0 -g" ;;
     "release") cflags="$cflags -O2" ;;
 esac
 set -x
