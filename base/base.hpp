@@ -4,7 +4,6 @@
 #pragma region Prelude
 #include <stddef.h>
 #include <stdint.h>
-#include <stdatomic.h>
 #include <new>
 
 using i8  = int8_t;
