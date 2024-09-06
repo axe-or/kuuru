@@ -6,7 +6,7 @@ mode="$1"
 
 set -eu
 
-cc='clang++'
+cc='g++'
 iflags='-I.'
 cflags='-std=c++17 -fPIC -Wall -Wextra'
 ldflags=''

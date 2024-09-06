@@ -37,7 +37,10 @@ Slice<byte> read_whole_file(string path, Allocator allocator){
 	namebuf[path.size()] = 0;
 
 	FILE* f = std::fopen(&namebuf[0], "rb");
-	defer(if(f) std::fclose(f));
+	if(f == nullptr){
+		return {};
+	}
+	defer(std::fclose(f));
 
 	isize start = 0;
 	isize end = 0;
@@ -62,7 +65,9 @@ int main(void) {
 	defer(free_all(temp_allocator));
 
 	auto src = read_whole_file("main.cpp", allocator);
+	defer(destroy(src, allocator));
+
 	writeln(string::from_bytes(src));
-	
+
     return 0;
 }

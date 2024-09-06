@@ -22,6 +22,10 @@ enum class TokenKind : i8 {
 
 	Gt, Gte, Lt, Lte, Eq_Eq, Not_Eq,
 
+	// Assignment versions of operators
+	Plus_Assign, Minus_Assign, Star_Assign, Slash_Assign, Modulo_Assign,
+	And_Assign, Or_Assign, Xor_Assign,
+
 	End_Of_File,
 
 	_enum_length,
@@ -30,7 +34,7 @@ enum class TokenKind : i8 {
 struct Token {
 	TokenKind kind{0};
 	string lexeme = "";
-	i32 source_offset = 0;
+	isize source_offset = 0;
 };
 
 struct Lexer {
