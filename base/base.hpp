@@ -324,26 +324,24 @@ struct Option {
 	}
 
 	void operator=(T const& e){
-		reset(e);
+		set(e);
 	}
 
 	void operator=(Option<T> const& opt){
 		if(opt.has_value){
-			reset(opt.data);
+			set(opt.data);
 		}
 	}
 
 	static Option from(T const& e){
 		Option<T> opt;
-		opt.reset(e);
+		opt.set(e);
 		return opt;
 	}
 
-	static Option none(){
-		return Option<T>{};
-	}
+	static constexpr Option<T> none = {0};
 
-	void reset(T const& e){
+	void set(T const& e){
 		if(has_value){
 			data = e;
 		} else {
@@ -361,10 +359,11 @@ struct Option {
 
 	Option(){}
 
+	// Required by C++ due to union
 	Option(Option<T> const& opt) : data(opt.data), has_value(opt.has_value) {}
 
 	~Option(){
-		reset();
+		set();
 	}
 };
 
