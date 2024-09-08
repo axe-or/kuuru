@@ -6,17 +6,18 @@ IGNOREFLAGS := -Wno-unknown-pragmas
 
 .PHONY: clean build
 
-build: yuyu
-	@./yuyu
+build: bin/kuuru
+	@mkdir -p bin
+	@./bin/kuuru
 
-base.o: base/$(wildcard base/*.c base/*.h)
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/lib.cpp -o base.o
+bin/base.o: base/$(wildcard base/*.c base/*.h)
+	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/lib.cpp -o bin/base.o
 
-compiler.o: $(wildcard compiler/*.c compiler/*.h)
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/yuyu.cpp -o compiler.o
+bin/compiler.o: $(wildcard compiler/*.c compiler/*.h)
+	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/kuuru.cpp -o bin/compiler.o
 
-yuyu: main.cpp compiler.o base.o
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.cpp compiler.o base.o -o yuyu $(LDFLAGS)
+bin/kuuru: main.cpp bin/compiler.o bin/base.o
+	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.cpp bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
 
 clean:
-	rm -f *.o yuyu
+	rm -f bin/*

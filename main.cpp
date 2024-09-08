@@ -1,5 +1,5 @@
 #include "base/base.hpp"
-#include "compiler/yuyu.hpp"
+#include "compiler/kuuru.hpp"
 #include <cstdio>
 
 void writeln(string msg){

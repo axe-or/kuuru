@@ -1,4 +1,4 @@
-#include "yuyu.hpp"
+#include "kuuru.hpp"
 
 #include "lexer.cpp"
 #include "parser.cpp"

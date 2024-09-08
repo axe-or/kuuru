@@ -1,4 +1,4 @@
-#include "yuyu.hpp"
+#include "kuuru.hpp"
 
 pair<rune, i32> Lexer::advance(){
     return iter.next();
