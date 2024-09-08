@@ -32,7 +32,7 @@ enum class TokenKind : i8 {
 };
 
 struct Token {
-	TokenKind kind{0};
+	TokenKind kind = TokenKind(0);
 	string lexeme = "";
 	isize source_offset = 0;
 };

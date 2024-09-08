@@ -1,5 +1,5 @@
 CXX := g++
-CFLAGS := -O0 -g -fPIC -std=c++17 -Wall -Wextra
+CFLAGS := -O1 -g -fPIC -std=c++17 -Wall -Wextra
 INCFLAGS := -I.
 LDFLAGS :=
 IGNOREFLAGS := -Wno-unknown-pragmas

@@ -1,5 +1,5 @@
 #include "base/base.hpp"
-#include "yuyu.hpp"
+#include "compiler/yuyu.hpp"
 #include <cstdio>
 
 void writeln(string msg){
@@ -59,8 +59,8 @@ int main(void) {
 	Allocator allocator, temp_allocator;
 	/* Init allocators */ {
 		auto allocators = init_allocators();
-		allocator = allocators.a;
-		temp_allocator = allocators.b;
+		allocator       = allocators.a;
+		temp_allocator  = allocators.b;
 	}
 	defer(free_all(temp_allocator));
 
