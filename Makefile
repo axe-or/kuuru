@@ -6,9 +6,11 @@ IGNOREFLAGS := -Wno-unknown-pragmas
 
 .PHONY: clean build
 
-build: bin/kuuru
-	@mkdir -p bin
+build: ./bin bin/kuuru
 	@./bin/kuuru
+
+./bin:
+	mkdir -p bin
 
 bin/base.o: base/$(wildcard base/*.c base/*.h)
 	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/lib.cpp -o bin/base.o
