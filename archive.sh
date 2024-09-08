@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-git archive main --format=zip > "yuyu-$(date +'%Y-%m-%d-%H-%M').zip"
+git archive HEAD --format=zip > "yuyu-$(git rev-parse --short=8 HEAD).zip"
