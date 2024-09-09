@@ -1,73 +1,37 @@
-#include "base/base.hpp"
-#include "compiler/kuuru.hpp"
-#include <cstdio>
-
-void writeln(string msg){
-	std::printf("%.*s\n", (int)(msg.size()), msg.raw_data());
-}
+#include "base/memory.h"
+#include "base/heap_allocator.h"
+#include "base/arena_allocator.h"
+// #include "compiler/kuuru.hpp"
+// #include <cstdio>
 
 #define MEBIBYTE (1024ll * 1024ll)
 
-static pair<Allocator> init_allocators(){
-	static Allocator allocator{0};
-	static Allocator temp_allocator{0};
-	static Arena arena{0};
-	static Array<byte, 8 * MEBIBYTE> arena_buf{0};
+static void init_allocators(Mem_Allocator* temp, Mem_Allocator* allocator){
+	#define ARENA_SIZE (4 * MEBIBYTE)
 
-	static bool init = false;
-	if(!init){
-		mem_zero(arena_buf.sub().raw_data(), arena_buf.size());
-		arena = Arena::from(arena_buf.sub());
-		temp_allocator = arena.allocator();
-		allocator = HeapAllocator::get();
-		init = true;
-	}
-	return {allocator, temp_allocator};
-}
+	static bool initialized = false;
 
-Slice<byte> read_whole_file(string path, Allocator allocator){
-	constexpr isize MAX_PATH_SIZE = 4096;
-	char namebuf[MAX_PATH_SIZE];
+	static Mem_Arena arena;
+	static byte arena_buf[ARENA_SIZE] = {0};
 
-	if(path.size() >= MAX_PATH_SIZE){
-		return {};
+	if(!initialized){
+		arena_init(&arena, arena_buf, ARENA_SIZE);
+		*temp = arena_allocator(&arena);
+		*allocator = heap_allocator();
 	}
 
-	mem_copy_no_overlap(namebuf, path.raw_data(), path.size());
-	namebuf[path.size()] = 0;
-
-	FILE* f = std::fopen(&namebuf[0], "rb");
-	if(f == nullptr){
-		return {};
-	}
-	defer(std::fclose(f));
-
-	isize start = 0;
-	isize end = 0;
-
-	std::fseek(f, 0, SEEK_END);
-	end = std::ftell(f);
-	std::rewind(f);
-	start = std::ftell(f);
-
-	auto filedata = make_slice<byte>(end - start, allocator);
-	std::fread(filedata.raw_data(), 1, end - start, f);
-	return filedata;
+	#undef ARENA_SIZE
 }
 
 int main(void) {
-	Allocator allocator, temp_allocator;
-	/* Init allocators */ {
-		auto allocators = init_allocators();
-		allocator       = allocators.a;
-		temp_allocator  = allocators.b;
-	}
-	defer(free_all(temp_allocator));
+	Mem_Allocator allocator, temp_allocator;
+	init_allocators(&temp_allocator, &allocator);
 
-	auto src = read_whole_file("main.cpp", allocator);
-	defer(destroy(src, allocator));
+	// auto src = read_whole_file("main.cpp", allocator);
+	// defer(destroy(src, allocator));
 
-	writeln(string::from_bytes(src));
+	// writeln(string::from_bytes(src));
 
+	mem_free_all(temp_allocator);
     return 0;
 }
