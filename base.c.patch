@@ -1,0 +1,12 @@
+diff --git a/assert.h b/assert.h
+index 2ab8b76..32149cf 100644
+--- a/assert.h
++++ b/assert.h
+@@ -3,6 +3,7 @@
+ #include "prelude.h"
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdnoreturn.h>
+ 
+ static inline
+ void debug_assert(bool pred, cstring msg){
