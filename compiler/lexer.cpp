@@ -19,24 +19,6 @@ bool Lexer::advance_on_match(rune expect){
     return true;
 }
 
-#define TOKEN1(T_) \
-    { tk.kind = T_; } break
-
-#define TOKEN2(R_, T_, ALT_) \
-    if(advance_on_match(R_)){ \
-        tk.kind = T_; \
-    } else { \
-        tk.kind = ALT_; \
-    } break
-
-#define TOKEN3(R0_, T0_, R1_, T1_, ALT_) \
-    if(advance_on_match(R0_)){ \
-        tk.kind = T0_; \
-    } else if(advance_on_match(R1_)){ \
-        tk.kind = T1_; \
-    } else { \
-        tk.kind = ALT_; \
-    } break
 
 Token Lexer::next(){
     using K = TokenKind;
