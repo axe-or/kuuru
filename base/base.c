@@ -8,6 +8,5 @@
 #include "memory.h"
 #include "prelude.h"
 #include "string.h"
-#include "testing.h"
 #include "utf8.h"
 
