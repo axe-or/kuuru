@@ -12,7 +12,7 @@ build: ./bin bin/kuuru
 ./bin:
 	mkdir -p bin
 
-bin/base.o: base/$(wildcard base/*.c base/*.h)
+bin/base.o: $(wildcard base/*.c base/*.h)
 	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/base.c -o bin/base.o
 
 bin/compiler.o: $(wildcard compiler/*.c compiler/*.h)
