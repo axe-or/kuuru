@@ -1,5 +1,5 @@
-CXX := g++
-CFLAGS := -O1 -g -fPIC -std=c++17 -Wall -Wextra
+CC := gcc
+CFLAGS := -O1 -g -fPIC -std=c11 -Wall -Wextra -Werror=vla
 INCFLAGS := -I.
 LDFLAGS :=
 IGNOREFLAGS := -Wno-unknown-pragmas
@@ -13,13 +13,13 @@ build: ./bin bin/kuuru
 	mkdir -p bin
 
 bin/base.o: base/$(wildcard base/*.c base/*.h)
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/lib.cpp -o bin/base.o
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/base.c -o bin/base.o
 
 bin/compiler.o: $(wildcard compiler/*.c compiler/*.h)
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/kuuru.cpp -o bin/compiler.o
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/kuuru.c -o bin/compiler.o
 
 bin/kuuru: main.cpp bin/compiler.o bin/base.o
-	$(CXX) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.cpp bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.cpp bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
 
 clean:
 	rm -f bin/*
