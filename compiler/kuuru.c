@@ -1,5 +1,4 @@
-#include "kuuru.h"
-
-// #include "lexer.cpp"
-// #include "parser.cpp"
-// #include "type_checker.cpp"
+#define KUURU_IMPLEMENTATION 1
+#include "lexer.h"
+#include "parser.h"
+#include "type_checker.h"

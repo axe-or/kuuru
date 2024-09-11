@@ -24,4 +24,9 @@ static void init_allocators(Mem_Allocator* allocator, Mem_Allocator* temp_alloca
 int main(){
     Mem_Allocator allocator, temp_allocator;
     init_allocators(&allocator, &temp_allocator);
+
+
+cleanup:
+    mem_free_all(temp_allocator);
+    return 0;
 }

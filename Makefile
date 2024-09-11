@@ -18,8 +18,8 @@ bin/base.o: $(wildcard base/*.c base/*.h)
 bin/compiler.o: $(wildcard compiler/*.c compiler/*.h)
 	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/kuuru.c -o bin/compiler.o
 
-bin/kuuru: main.cpp bin/compiler.o bin/base.o
-	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.cpp bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
+bin/kuuru: main.c bin/compiler.o bin/base.o
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.c bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
 
 clean:
 	rm -f bin/*
