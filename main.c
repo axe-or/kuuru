@@ -1,6 +1,11 @@
 #include "base/memory.h"
 #include "base/arena_allocator.h"
 #include "base/heap_allocator.h"
+#include "base/bytes_buffer.h"
+
+#include "kuuru_c/lexer.h"
+
+#include "kuuru_c/utilities.h"
 
 #define MEBIBYTE (1024ll * 1024ll)
 static void init_allocators(Mem_Allocator* allocator, Mem_Allocator* temp_allocator){
@@ -25,8 +30,24 @@ int main(){
     Mem_Allocator allocator, temp_allocator;
     init_allocators(&allocator, &temp_allocator);
 
+	Lexer lexer = lexer_make(str_from("Hello, daddy, hello mom, chchchchchchchchchchhc, CHERRY BOMB!"));
+	while(1){
+		Token tk = lexer_next(&lexer);
+		if(tk.kind == Tk_EOF){ break; }
+	}
 
-cleanup:
-    mem_free_all(temp_allocator);
+	Bytes_Buffer bb;
+	if(!buffer_init(&bb, temp_allocator, 256)){
+		return 1;
+	}
+
+	Token tokens[] = {{.lexeme = str_from("Hello"), .kind = Tk_Identifier}};
+	format_token_list(&bb, tokens, 1);
+	byte* b = buffer_bytes(&bb);
+	printf("%s\n", b);
+
+	cleanup: {
+		mem_free_all(temp_allocator);
+	}
     return 0;
 }

@@ -15,11 +15,11 @@ build: ./bin bin/kuuru
 bin/base.o: $(wildcard base/*.c base/*.h)
 	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c base/base.c -o bin/base.o
 
-bin/compiler.o: $(wildcard compiler/*.c compiler/*.h)
-	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c compiler/kuuru.c -o bin/compiler.o
+bin/kuuru_c.o: $(wildcard kuuru_c/*.c kuuru_c/*.h)
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) -c kuuru_c/kuuru.c -o bin/kuuru_c.o
 
-bin/kuuru: main.c bin/compiler.o bin/base.o
-	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.c bin/compiler.o bin/base.o -o bin/kuuru $(LDFLAGS)
+bin/kuuru: main.c bin/kuuru_c.o bin/base.o
+	$(CC) $(IGNOREFLAGS) $(CFLAGS) $(INCFLAGS) main.c bin/kuuru_c.o bin/base.o -o bin/kuuru $(LDFLAGS)
 
 clean:
 	rm -f bin/*

@@ -9,30 +9,72 @@ typedef enum TokenKind TokenKind;
 typedef struct Token Token;
 typedef struct Lexer Lexer;
 
+#define KUURU_KEYWORD_TABLE \
+	X(Func, "func") \
+	X(Let, "let") \
+	X(If, "if") \
+	X(Else, "else") \
+	X(For, "for") \
+	X(In, "in") \
+	X(Break, "break") \
+	X(Continue, "continue") \
+	X(Return, "return") \
+	X(True, "true") \
+	X(False, "false") \
+	X(Nil, "nil")
+
+#define KUURU_OPERATOR_TABLE \
+	X(Paren_Open, "(") \
+	X(Paren_Close, ")") \
+	X(Square_Open, "[") \
+	X(Square_Close, "]") \
+	X(Curly_Open, "{") \
+	X(Curly_Close, "}") \
+	X(Dot, ".") \
+	X(Comma, ",") \
+	X(Colon, ":") \
+	X(Semicolon, ";") \
+	X(Equal, "=") \
+	X(Caret, "^") \
+	X(Plus, "+") \
+	X(Minus, "-") \
+	X(Star, "*") \
+	X(Slash, "/") \
+	X(Modulo, "%") \
+	X(And, "&") \
+	X(Or, "|") \
+	X(Xor, "~") \
+	X(Gt, ">") \
+	X(Gte, ">=") \
+	X(Lt, "<") \
+	X(Lte, ">=") \
+	X(Eq_Eq, "==") \
+	X(Not_Eq, "!=") \
+	X(Logic_And, "&&") \
+	X(Logic_Or, "||") \
+	X(Logic_Not, "!") \
+	X(Plus_Assign, "+=") \
+	X(Minus_Assign, "-=") \
+	X(Star_Assign, "*=") \
+	X(Slash_Assign, "/=") \
+	X(Modulo_Assign, "%=") \
+	X(And_Assign, "&=") \
+	X(Or_Assign, "|=") \
+	X(Xor_Assign, "~=")
+
 enum TokenKind {
 	Tk_Unknown = 0,
 
-	Tk_Identifier, Tk_Let, Tk_Fn, Tk_Struct, Tk_If, Tk_Else, Tk_For, Tk_Match, Tk_Break, Tk_Continue, Tk_Return,
+	// Keywords & Operators
+	#define X(Name, Str) Tk_##Name,
+		KUURU_KEYWORD_TABLE
+		KUURU_OPERATOR_TABLE
+	#undef X
 
-	Tk_Int, Tk_Real, Tk_String, Tk_Rune, Tk_True, Tk_False, Tk_Nil,
-
-	Tk_Paren_Open,	Tk_Paren_Close, Tk_Square_Open, Tk_Square_Close, Tk_Curly_Open,	Tk_Curly_Close,
-
-	Tk_Dot, Tk_Comma, Tk_Colon, Tk_Semicolon, Tk_Equal, Tk_Caret,
-
-	Tk_Plus, Tk_Minus, Tk_Star, Tk_Slash, Tk_Modulo,
-	Tk_And, Tk_Or, Tk_Xor,
-
-	Tk_Logic_And, Tk_Logic_Or, Tk_Logic_Not,
-
-	Tk_Gt, Tk_Gte, Tk_Lt, Tk_Lte, Tk_Eq_Eq, Tk_Not_Eq,
-
-	// Assignment versions of operators
-	Tk_Plus_Assign, Tk_Minus_Assign, Tk_Star_Assign, Tk_Slash_Assign, Tk_Modulo_Assign,
-	Tk_And_Assign, Tk_Or_Assign, Tk_Xor_Assign,
+	// Id & Literals
+	Tk_Identifier, Tk_Int, Tk_Real, Tk_String, Tk_Rune,
 
 	Tk_EOF,
-
 	// _tk_enum_length,
 };
 
@@ -56,6 +98,19 @@ Token lexer_next(Lexer* lex);
 
 /// Implementation /////////////////////////////////////////////////////////////
 #ifdef KUURU_IMPLEMENTATION
+
+static const struct{ cstring key; TokenKind val; } str_to_keyword[] = {
+	#define X(Name, Str) {Str, Tk_##Name},
+	KUURU_KEYWORD_TABLE
+	#undef X
+};
+
+static const cstring operator_to_str[] = {
+	#define X(Name, Str) [Tk_##Name] = Str,
+	KUURU_OPERATOR_TABLE
+	#undef X
+};
+
 Lexer lexer_make(String source){
 	UTF8_Iterator iterator = {
 		.current = 0,
@@ -67,10 +122,10 @@ Lexer lexer_make(String source){
 		.iter = iterator,
 	};
 }
+
 bool lexer_done(Lexer const* lex){
 	return lex->iter.current >= lex->iter.data_length;
 }
-
 
 static
 UTF8_Decode_Result lexer_advance(Lexer* lex){
@@ -95,7 +150,11 @@ UTF8_Decode_Result lexer_peek(Lexer* lex){
 static
 bool lexer_advance_on_match(Lexer* lex, Codepoint expect){
 	UTF8_Decode_Result res = lexer_peek(lex);
-	unimplemented();
+	if(res.codepoint == expect){
+		lex->iter.current += res.len;
+		return true;
+	}
+	return false;
 }
 
 #define TOKEN1(T_) \
@@ -171,3 +230,4 @@ Token lexer_next(Lexer* lexer){
 #undef TOKEN2
 #undef TOKEN3
 #endif
+
