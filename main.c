@@ -26,11 +26,17 @@ static void init_allocators(Mem_Allocator* allocator, Mem_Allocator* temp_alloca
     #undef ARENA_SIZE
 }
 
+struct Token_List {
+	Token* tokens;
+	isize len;
+	isize cap;
+};
+
 int main(){
     Mem_Allocator allocator, temp_allocator;
     init_allocators(&allocator, &temp_allocator);
 
-	Lexer lexer = lexer_make(str_from("Hello, daddy, hello mom, chchchchchchchchchchhc, CHERRY BOMB!"));
+	Lexer lexer = lexer_make(str_from("+-*/%"));
 	while(1){
 		Token tk = lexer_next(&lexer);
 		if(tk.kind == Tk_EOF){ break; }
@@ -40,6 +46,7 @@ int main(){
 	if(!buffer_init(&bb, temp_allocator, 256)){
 		return 1;
 	}
+
 
 	Token tokens[] = {{.lexeme = str_from("Hello"), .kind = Tk_Identifier}};
 	format_token_list(&bb, tokens, 1);

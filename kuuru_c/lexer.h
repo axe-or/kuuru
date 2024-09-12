@@ -4,7 +4,7 @@
 #include "base/utf8.h"
 #include "base/string.h"
 
-/// Interface //////////////////////////////////////////////////////////////////
+///- Interface -----------------------------------------------------------------
 typedef enum TokenKind TokenKind;
 typedef struct Token Token;
 typedef struct Lexer Lexer;
@@ -96,7 +96,7 @@ bool lexer_done(Lexer const* lex);
 // Get next token. Returns an End_Of_File token when finished.
 Token lexer_next(Lexer* lex);
 
-/// Implementation /////////////////////////////////////////////////////////////
+///- Implementation ------------------------------------------------------------
 #ifdef KUURU_IMPLEMENTATION
 
 static const struct{ cstring key; TokenKind val; } str_to_keyword[] = {
