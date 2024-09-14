@@ -1,7 +1,4 @@
-#include "base/memory.h"
-#include "base/arena_allocator.h"
-#include "base/heap_allocator.h"
-#include "base/bytes_buffer.h"
+#include "base.h"
 
 #include "kuuru_c/lexer.h"
 

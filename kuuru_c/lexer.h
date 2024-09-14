@@ -1,8 +1,6 @@
 #pragma once
 
-#include "base/assert.h"
-#include "base/utf8.h"
-#include "base/string.h"
+#include "base.h"
 
 ///- Interface -----------------------------------------------------------------
 typedef enum TokenKind TokenKind;

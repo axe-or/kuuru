@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/bytes_buffer.h"
+#include "base.h"
 #include "lexer.h"
 
 static bool token_is_literal(TokenKind k){

@@ -1,6 +1,6 @@
 CC := gcc
 CFLAGS := -O1 -g -fPIC -std=c11 -Wall -Wextra -Werror=vla
-INCFLAGS := -I.
+INCFLAGS := -I. -I./base
 LDFLAGS :=
 IGNOREFLAGS := -Wno-unknown-pragmas
 
